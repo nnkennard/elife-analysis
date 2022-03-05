@@ -76,19 +76,19 @@ def main():
   guest_client = openreview.Client(baseurl='https://api.openreview.net')
   data_dir = "reviews/"
   offset = 0
-  limit = 10
+  limit = 100
   while True:
     print("Working on submissions {0} to {1}".format(offset, offset + limit))
     blind_submissions = guest_client.get_notes(
         invitation='ICLR.cc/2021/Conference/-/Blind_Submission',
         offset=offset,
         limit=limit)
-    for sub in tqdm.tqdm(blind_submissions):
-      save_reviews(sub.forum, guest_client, data_dir)
     if blind_submissions:
       offset += limit
     else:
       break
+    for sub in tqdm.tqdm(blind_submissions):
+      save_reviews(sub.forum, guest_client, data_dir)
 
 
 if __name__ == "__main__":
