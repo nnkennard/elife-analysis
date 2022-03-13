@@ -46,7 +46,7 @@ class Review(object):
     return {key: token_dict[key] for key in STANZA_KEYS}
 
   def as_json(self):
-    dict_prep = {"text" : self.text}
+    dict_prep = {"original_text" : self.text}
     dict_prep.update(self.metadata)
     dict_prep.update(self.syntax)
     return json.dumps(dict_prep)
