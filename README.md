@@ -4,13 +4,12 @@
 
 I used [Stanza](https://stanfordnlp.github.io/stanza/) to annotate DISAPERE reviews with dependency parses, then trained a logistic regression classifier (using [scikit-learn](https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LogisticRegression.html)) to classify sentences as 'some polarity' or 'no polarity' (not distinguishing between positive and negative polarity, for now).
 
-Surprisingly, using dependency path features of length 2 resulted in a reasonable performance on the dev set of DISAPERE. This classifier represented each sentence as a bag of dependency paths, of the form `(deprel_1_2, POS_2, deprel_2_3, POS_3)`, so notably, does not include any lexical information. This hopefully will guard against a severe drop in performance when switching to the biomedical domain.
+Surprisingly, using dependency path features of length 2 resulted in a reasonable performance on the dev set of DISAPERE (86% accuracy). This classifier represented each sentence as a bag of dependency paths, of the form `(deprel_1_2, POS_2, deprel_2_3, POS_3)`, so notably, does not include any lexical information. This hopefully will guard against a severe drop in performance when switching to the biomedical domain. That said, these features are not great, and actually quite unsophisticated. There is more to be done, but here are the results with these naive features for now.
 
 All examples in the readme are from [this review](https://openreview.net/forum?id=YTWGvpFOQD-&noteId=U5WeIre4ggR).
 
-Example featurization:
+### Example featurization:
 
-These features are not great, and actually quite unsophisticated. There is more to be done, but anyway, here is this stuff for now.
 
 _Hence, I do not consider this as a new insight or a contribution._
 
@@ -30,12 +29,16 @@ _Hence, I do not consider this as a new insight or a contribution._
 ('conj', 'NN', 'det', 'DT'): 1
 ```
 
-Results of logistic regression classifier:
+You can use the [CoreNLP demo](corenlp.run) for a diagram of the parse represented above.
+
+### Results of logistic regression classifier:
 
 | Data split | Accuracy |
 |------------|----------|
 | Train      | 91.39%   |
 | Dev        | 86.46%   |
+
+### Results on unseen data
 
 I applied this classifier to reviews from ICLR 2021 (all posted after any review in DISAPERE). Along with highlighting which sentences supposedly have or don't have some polarity, I extracted maximal noun phrases from the sentences that were classified as having some polarity.
 
