@@ -2,5 +2,35 @@
 
 ## Locating targets of criticism
 
-[Some results](https://nnkennard.github.io/elife-analysis/)
+I used [Stanza](https://stanfordnlp.github.io/stanza/) to annotate DISAPERE reviews with dependency parses, then trained a logistic regression classifier (using [scikit-learn](https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LogisticRegression.html)) to classify sentences as 'some polarity' or 'no polarity' (not distinguishing between positive and negative polarity, for now).
+
+Surprisingly, using dependency path features of length 2 resulted in a reasonable performance on the dev set of DISAPERE. This classifier represented each sentence as a bag of dependency paths, of the form `(POS_1, deprel_1_2, POS_2, deprel_2_3, POS_3)`, so notably, does not include any lexical information. This hopefully will guard against a severe drop in performance when switching to the biomedical domain.
+
+
+All examples in the readme are from [this review](https://openreview.net/forum?id=YTWGvpFOQD-&noteId=U5WeIre4ggR).
+
+Example featurization:
+
+TODO
+
+Results of logistic regression classifier:
+
+TODO
+
+I applied this classifier to reviews from ICLR 2021 (all posted after any review in DISAPERE). Along with highlighting which sentences supposedly have or don't have some polarity, I extracted maximal noun phrases from the sentences that were classified as having some polarity.
+
+[Results](https://nnkennard.github.io/elife-analysis/)
+
+### Remaining action items:
+* Distinguishing between positive and negative polarity sentences (without labels in the new domain)
+  * Turney 2002 [Thumbs Up or Thumbs Down? Semantic Orientation Applied to Unsupervised Classification of Reviews](https://aclanthology.org/P02-1053)
+  * Zeng et al. 2020 [A Variational Approach to Unsupervised Sentiment Analysis](https://arxiv.org/abs/2008.09394)
+* Determining which of the NPs are the targets of criticism, e.g.
+  * _Hence, I do not consider **this** as a new insight or a contribution._
+  * _**The presentation of results (Table 3)** is a bit strange._
+* Linking targets of criticism to a NP that is more descriptive (something earlier in the coreference chain)
+* Dealing with things that aren't going to end up being in a coreference chain. E.g. bolded phrases below are coreferent, but no major coref datasets do discourse deixis
+  * _**The main focus and the message in the paper** is that the handcrafted features work better compared to learned features during training of NNs and having more training data results in better outcomes (i.e. a better privacy-utility trade-off)._)
+  * _Starting with the latter, this is apparent from the noise formulation in DPSGD, where the noise is reduced via sampling probability, which decreases as the data size grows_
+  * _Hence, I do not consider **this** as a new insight or a contribution._
 
