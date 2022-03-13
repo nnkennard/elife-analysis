@@ -28,4 +28,16 @@ pipe = Pipeline(
 pipe.fit(examples['train'], labels['train'])
 print("Train accuracy", pipe.score(examples['train'], labels['train']))
 print("Dev accuracy", pipe.score(examples['dev'], labels['dev']))
+
+
+(_, vectorizer), (_, classifier) = pipe.steps
+sorted_features = sorted(zip(vectorizer.get_feature_names_out(), classifier.coef_[0]), key=lambda x: -1 * x[1]**2)
+
+print("Influential features")
+for i, (a, b) in enumerate(sorted_features):
+  if i == 10:
+    break
+  print(i, "-".join(eval(a)), b)
+
+
 joblib.dump(pipe, "ckpt/polarity_classifier.joblib")
