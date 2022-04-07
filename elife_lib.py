@@ -52,3 +52,26 @@ def get_nsubj_subtree(sentence):
         print()
         print(" ".join([x.text for x in sentence.tokens[min_idx:max_idx + 1]]))
         print("-" * 80 + "\n")
+
+
+STANZA_PIPELINE = stanza.Pipeline("en", processors="tokenize")
+
+def sentencize(review):
+  annotated = STANZA_PIPELINE(review["review_text"])
+  sentences = []
+  for i, sentence in enumerate(annotated.sentences):
+    sentences.append({"identifier": f'{review["review_id"]}_{i}',
+    "text": sentence.text})
+  return sentences
+
+
+def sentencize_dir(data_dir):
+  examples = {}
+  for filename in glob.glob(f"{data_dir}/*.json"):
+    with open(filename, 'r') as f:
+      obj = json.load(f)
+      for review in obj:
+        examples[review['review_id']] = sentencize(review)
+  return examples
+
+

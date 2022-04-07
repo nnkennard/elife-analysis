@@ -25,7 +25,7 @@ parser.add_argument(
     "-m",
     "--mode",
     type=str,
-    help="train or eval",
+    help="train eval or predict",
 )
 
 
@@ -34,7 +34,7 @@ EPOCHS = 100
 PATIENCE = 20
 BATCH_SIZE = 8
 LEARNING_RATE = 2e-5
-TRAIN, EVAL = "train eval".split()
+TRAIN, EVAL, PREDICT = "train eval predict".split()
 PRE_TRAINED_MODEL_NAME = "bert-base-uncased"
 
 HistoryItem = collections.namedtuple(
@@ -45,6 +45,18 @@ Example = collections.namedtuple("Example",
 
 def get_label(original_label):
   return (0 if original_label == "none" else 1)
+
+tokenizer_fn = lambda tok, text: tok.encode_plus(
+  text,
+  add_special_tokens=True,
+  return_token_type_ids=False,
+  padding="max_length",
+  max_length=512,
+  truncation=True,
+  return_attention_mask=True,
+  return_tensors='pt',
+  )
+
 
 class PolarityDetectionDataset(Dataset):
 
@@ -70,17 +82,7 @@ class PolarityDetectionDataset(Dataset):
     text = str(self.texts[item])
     target = self.targets[item]
 
-
-    encoding = self.tokenizer.encode_plus(
-        text,
-        add_special_tokens=True,
-        return_token_type_ids=False,
-        padding="max_length",
-        max_length=512,
-        truncation=True,
-        return_attention_mask=True,
-        return_tensors="pt",
-    )
+    encoding = tokenizer_fn(self.tokenizer, text)
 
     return {
         "reviews_text": text,
@@ -268,20 +270,46 @@ def do_eval(tokenizer, model, loss_fn, data_dir):
     pickle.dump({"results": list(zip(identifiers, labels))}, f)
 
 
+def do_predict(tokenizer, model, data_dir):
+
+  model.load_state_dict(
+      torch.load(f"ckpt/best_bert_model.bin"))
+
+  overall_predictions = {}
+  with open(f'{data_dir}/tokenized_examples.pkl', 'rb') as f:
+    for review_id, examples in pickle.load(f).items():
+      predictions = collections.OrderedDict()
+      for example in examples:
+        encoded_review = tokenizer_fn(tokenizer,
+        example["text"])
+        input_ids = encoded_review['input_ids'].to(DEVICE)
+        attention_mask = encoded_review['attention_mask'].to(DEVICE)
+
+        output = model(input_ids, attention_mask)
+        _, prediction = torch.max(output, dim=1)
+        predictions[example['identifier']] = prediction.item()
+      overall_predictions[review_id] = predictions
+  
+  with open(f'{data_dir}/bert_results.json', 'w') as f:
+    json.dump(overall_predictions, f)
+
+
+
 def main():
 
   args = parser.parse_args()
-  assert args.mode in [TRAIN, EVAL]
+  assert args.mode in [TRAIN, EVAL, PREDICT]
 
   tokenizer = BertTokenizer.from_pretrained(PRE_TRAINED_MODEL_NAME)
   model = SentimentClassifier(2).to(DEVICE)
   loss_fn = nn.BCEWithLogitsLoss().to(DEVICE)
 
-  
   if args.mode == TRAIN:
     do_train(tokenizer, model, loss_fn, args.data_dir)
-  else:
+  elif args.mode == EVAL:
     do_eval(tokenizer, model, loss_fn, args.data_dir)
+  elif args.mode == PREDICT:
+    do_predict(tokenizer, model, args.data_dir)
 
   
 if __name__ == "__main__":
