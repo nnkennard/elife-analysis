@@ -37,6 +37,7 @@ def get_maximal_nps(tree):
       stack += this_tree.children
   return np_spans
 
+
 def build_table_from_rows(rows):
   table_template = """
   <table class="table">
@@ -63,6 +64,7 @@ def build_table_from_rows(rows):
   <td> {3} </td> 
   </tr>  """.format(row['idx'], row['sentence'], row['polarity'], row['nps']))
   return table_template.format("\n".join(row_texts))
+
 
 def get_nps_with_polarity_table(text, split_sentences=True):
   dataframe_rows = []
@@ -92,6 +94,7 @@ def note_is_review(note):
     return False
   assert len(note.signatures) == 1
   return "AnonReviewer" in note.signatures[0]
+
 
 Review = collections.namedtuple(
     "Review", "forum_id review_id text confidence rating".split())
@@ -131,7 +134,9 @@ def main():
       break
     else:
       offset += batch_size
-  review_tables = [get_nps_with_polarity_table(review.text) for review in reviews]
+  review_tables = [
+      get_nps_with_polarity_table(review.text) for review in reviews
+  ]
 
   with open("polarity_nps_sample.html", 'w') as f:
     f.write(html_template.format("<br/><br/>".join(review_tables)))
