@@ -21,17 +21,19 @@ parser.add_argument(
     type=str,
     help="path to data file containing score jsons",
 )
-
 parser.add_argument(
-    "-n",
-    "--dataset_name",
+    "-m",
+    "--mode",
     type=str,
-    help="e.g. disapere or ape",
+    help="train or eval",
 )
+
 
 DEVICE = "cuda"
 EPOCHS = 100
 PATIENCE = 20
+BATCH_SIZE = 8
+LEARNING_RATE = 2e-5
 TRAIN, EVAL = "train eval".split()
 PRE_TRAINED_MODEL_NAME = "bert-base-uncased"
 
@@ -109,6 +111,8 @@ def create_data_loader(data_dir, subset, tokenizer):
       f'{data_dir}/{subset}/',
       tokenizer=tokenizer,
   )
+  return DataLoader(ds, batch_size=BATCH_SIZE, num_workers=4)
+
 
 
 def build_data_loaders(data_dir, tokenizer):
@@ -178,29 +182,26 @@ def train_or_eval(
     return correct_predictions.double().item() / n_examples, np.mean(losses)
 
 
-def get_metric_helper(data_dir, subset_key):
-  with open(f"{data_dir}/examples_{subset_key}_helper.json", "r") as f:
-    return json.load(f)
+def do_train(tokenizer, model, loss_fn, data_dir):
+  hyperparams = {
+      "epochs": EPOCHS,
+      "patience": PATIENCE,
+      "learning_rate": LEARNING_RATE,
+      "batch_size": BATCH_SIZE,
+      "bert_model": PRE_TRAINED_MODEL_NAME,
+  }
 
-
-def main():
-
-  args = parser.parse_args()
-
-  tokenizer = BertTokenizer.from_pretrained(PRE_TRAINED_MODEL_NAME)
   (
       train_data_loader,
       val_data_loader,
-  ) = build_data_loaders(args.data_dir, tokenizer)
+  ) = build_data_loaders(data_dir, tokenizer)
 
-  model = SentimentClassifier(2).to(DEVICE)
-  optimizer = AdamW(model.parameters(), lr=2e-5)
+  optimizer = AdamW(model.parameters(), lr=LEARNING_RATE)
   total_steps = len(train_data_loader) * EPOCHS
 
   scheduler = transformers.get_linear_schedule_with_warmup(
       optimizer, num_warmup_steps=0, num_training_steps=total_steps)
 
-  loss_fn = nn.BCEWithLogitsLoss().to(DEVICE)
 
   history = []
   best_accuracy = 0
@@ -233,13 +234,55 @@ def main():
     print()
 
     if val_acc > best_accuracy:
-      torch.save(model.state_dict(), f"outputs/best_model.bin")
+      torch.save(model.state_dict(), f"ckpt/best_bert_model.bin")
       best_accuracy = val_acc
       best_accuracy_epoch = epoch
 
-  with open(f"outputs/history.pkl", "wb") as f:
+  with open(f"ckpt/history.pkl", "wb") as f:
     pickle.dump(history, f)
 
+def do_eval(tokenizer, model, loss_fn, data_dir):
+  test_data_loader = create_data_loader(
+      data_dir,
+      "dev",
+      tokenizer,
+  )
 
+  model.load_state_dict(
+      torch.load(f"ckpt/best_bert_model.bin"))
+
+  results = train_or_eval("eval",
+                          model,
+                          test_data_loader,
+                          loss_fn,
+                          DEVICE,
+                          return_preds=True)
+
+  identifiers = []
+  labels = []
+  for i, l in results:
+    identifiers += i
+    labels += l
+
+  with open(f"outputs/test_results.pkl", "wb") as f:
+    pickle.dump({"results": list(zip(identifiers, labels))}, f)
+
+
+def main():
+
+  args = parser.parse_args()
+  assert args.mode in [TRAIN, EVAL]
+
+  tokenizer = BertTokenizer.from_pretrained(PRE_TRAINED_MODEL_NAME)
+  model = SentimentClassifier(2).to(DEVICE)
+  loss_fn = nn.BCEWithLogitsLoss().to(DEVICE)
+
+  
+  if args.mode == TRAIN:
+    do_train(tokenizer, model, loss_fn, args.data_dir)
+  else:
+    do_eval(tokenizer, model, loss_fn, args.data_dir)
+
+  
 if __name__ == "__main__":
   main()
