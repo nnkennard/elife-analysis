@@ -28,7 +28,6 @@ parser.add_argument(
     help="train eval or predict",
 )
 
-
 DEVICE = "cuda"
 EPOCHS = 100
 PATIENCE = 20
@@ -40,22 +39,23 @@ PRE_TRAINED_MODEL_NAME = "bert-base-uncased"
 HistoryItem = collections.namedtuple(
     "HistoryItem", "epoch train_acc train_loss val_acc val_loss".split())
 
-Example = collections.namedtuple("Example",
-  "identifier text target".split())
+Example = collections.namedtuple("Example", "identifier text target".split())
+
 
 def get_label(original_label):
-  return (0 if original_label == "none" else 1)
+  return 0 if original_label == "none" else 1
+
 
 tokenizer_fn = lambda tok, text: tok.encode_plus(
-  text,
-  add_special_tokens=True,
-  return_token_type_ids=False,
-  padding="max_length",
-  max_length=512,
-  truncation=True,
-  return_attention_mask=True,
-  return_tensors='pt',
-  )
+    text,
+    add_special_tokens=True,
+    return_token_type_ids=False,
+    padding="max_length",
+    max_length=512,
+    truncation=True,
+    return_attention_mask=True,
+    return_tensors="pt",
+)
 
 
 class PolarityDetectionDataset(Dataset):
@@ -64,14 +64,20 @@ class PolarityDetectionDataset(Dataset):
     examples = []
     print(data_dir)
     for filename in sorted(glob.glob(f"{data_dir}/*")):
-      with open(filename, 'r') as f:
+      with open(filename, "r") as f:
         obj = json.load(f)
         review_id = obj["metadata"]["review_id"]
         for i, review_sentence in enumerate(obj["review_sentences"]):
-          examples.append(Example(f"{review_id}|{i}", review_sentence["text"],
-          get_label(review_sentence["pol"])))
+          examples.append(
+              Example(
+                  f"{review_id}|{i}",
+                  review_sentence["text"],
+                  get_label(review_sentence["pol"]),
+              ))
     self.identifiers, self.texts, self.target_indices = zip(*examples)
-    self.targets = [np.eye(2, dtype=np.float64)[int(i)] for i in self.target_indices]
+    self.targets = [
+        np.eye(2, dtype=np.float64)[int(i)] for i in self.target_indices
+    ]
     self.tokenizer = tokenizer
     self.max_len = max_len
 
@@ -110,11 +116,10 @@ class SentimentClassifier(nn.Module):
 
 def create_data_loader(data_dir, subset, tokenizer):
   ds = PolarityDetectionDataset(
-      f'{data_dir}/{subset}/',
+      f"{data_dir}/{subset}/",
       tokenizer=tokenizer,
   )
   return DataLoader(ds, batch_size=BATCH_SIZE, num_workers=4)
-
 
 
 def build_data_loaders(data_dir, tokenizer):
@@ -129,7 +134,8 @@ def build_data_loaders(data_dir, tokenizer):
           "dev",
           tokenizer,
       ),
-    )
+  )
+
 
 def train_or_eval(
     mode,
@@ -204,7 +210,6 @@ def do_train(tokenizer, model, loss_fn, data_dir):
   scheduler = transformers.get_linear_schedule_with_warmup(
       optimizer, num_warmup_steps=0, num_training_steps=total_steps)
 
-
   history = []
   best_accuracy = 0
   best_accuracy_epoch = None
@@ -243,6 +248,7 @@ def do_train(tokenizer, model, loss_fn, data_dir):
   with open(f"ckpt/history.pkl", "wb") as f:
     pickle.dump(history, f)
 
+
 def do_eval(tokenizer, model, loss_fn, data_dir):
   test_data_loader = create_data_loader(
       data_dir,
@@ -250,8 +256,7 @@ def do_eval(tokenizer, model, loss_fn, data_dir):
       tokenizer,
   )
 
-  model.load_state_dict(
-      torch.load(f"ckpt/best_bert_model.bin"))
+  model.load_state_dict(torch.load(f"ckpt/best_bert_model.bin"))
 
   results = train_or_eval("eval",
                           model,
@@ -272,27 +277,24 @@ def do_eval(tokenizer, model, loss_fn, data_dir):
 
 def do_predict(tokenizer, model, data_dir):
 
-  model.load_state_dict(
-      torch.load(f"ckpt/best_bert_model.bin"))
+  model.load_state_dict(torch.load(f"ckpt/best_bert_model.bin"))
 
   overall_predictions = {}
-  with open(f'{data_dir}/tokenized_examples.pkl', 'rb') as f:
+  with open(f"{data_dir}/tokenized_examples.pkl", "rb") as f:
     for review_id, examples in pickle.load(f).items():
       predictions = collections.OrderedDict()
       for example in examples:
-        encoded_review = tokenizer_fn(tokenizer,
-        example["text"])
-        input_ids = encoded_review['input_ids'].to(DEVICE)
-        attention_mask = encoded_review['attention_mask'].to(DEVICE)
+        encoded_review = tokenizer_fn(tokenizer, example["text"])
+        input_ids = encoded_review["input_ids"].to(DEVICE)
+        attention_mask = encoded_review["attention_mask"].to(DEVICE)
 
         output = model(input_ids, attention_mask)
         _, prediction = torch.max(output, dim=1)
-        predictions[example['identifier']] = prediction.item()
+        predictions[example["identifier"]] = prediction.item()
       overall_predictions[review_id] = predictions
-  
-  with open(f'{data_dir}/bert_results.json', 'w') as f:
-    json.dump(overall_predictions, f)
 
+  with open(f"{data_dir}/bert_results.json", "w") as f:
+    json.dump(overall_predictions, f)
 
 
 def main():
@@ -311,6 +313,6 @@ def main():
   elif args.mode == PREDICT:
     do_predict(tokenizer, model, args.data_dir)
 
-  
+
 if __name__ == "__main__":
   main()

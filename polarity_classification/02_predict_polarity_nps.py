@@ -62,7 +62,7 @@ def build_table_from_rows(rows):
   <td> {1}</td> 
   <td> {2} </td> 
   <td> {3} </td> 
-  </tr>  """.format(row['idx'], row['sentence'], row['polarity'], row['nps']))
+  </tr>  """.format(row["idx"], row["sentence"], row["polarity"], row["nps"]))
   return table_template.format("\n".join(row_texts))
 
 
@@ -90,7 +90,7 @@ def get_nps_with_polarity_table(text, split_sentences=True):
 
 
 def note_is_review(note):
-  if not 'review' in note.content:
+  if not "review" in note.content:
     return False
   assert len(note.signatures) == 1
   return "AnonReviewer" in note.signatures[0]
@@ -138,7 +138,7 @@ def main():
       get_nps_with_polarity_table(review.text) for review in reviews
   ]
 
-  with open("polarity_nps_sample.html", 'w') as f:
+  with open("polarity_nps_sample.html", "w") as f:
     f.write(html_template.format("<br/><br/>".join(review_tables)))
 
 
