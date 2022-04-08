@@ -52,15 +52,15 @@ def main():
       for review in reviews:
         examples += get_sentences(review)
 
-    os.makedirs(f"{args.data_dir}/", exist_ok=True) 
-    with open(f"{args.data_dir}/sentences.jsonl", 'w') as f:
+    os.makedirs(f"{args.data_dir}/", exist_ok=True)
+    with open(f"{args.data_dir}/sentences.jsonl", "w") as f:
       for e in examples:
         f.write(json.dumps(e) + "\n")
 
-  with open(f"{args.data_dir}/sentences.jsonl", 'r') as f:
+  with open(f"{args.data_dir}/sentences.jsonl", "r") as f:
     examples = [json.loads(line) for line in f]
 
-  with open(f"{args.data_dir}/features.jsonl", 'w') as f:
+  with open(f"{args.data_dir}/features.jsonl", "w") as f:
     for example in tqdm.tqdm(examples):
       # It's not ideal to do this on a sentence-by-sentence basis (too slow)
       # But it only needs to happen once per dataset, and I think it's cleaner

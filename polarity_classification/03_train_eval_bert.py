@@ -14,6 +14,8 @@ from torch.optim import AdamW
 from torch.utils.data import Dataset, DataLoader
 from transformers import BertTokenizer, BertModel
 
+import classification_lib
+
 parser = argparse.ArgumentParser(description="Create examples for WS training")
 parser.add_argument(
     "-d",
@@ -57,27 +59,19 @@ tokenizer_fn = lambda tok, text: tok.encode_plus(
     return_tensors="pt",
 )
 
+EYE_2 = np.eye(2, dtype=np.float64)
+
 
 class PolarityDetectionDataset(Dataset):
 
   def __init__(self, data_dir, tokenizer, max_len=512):
-    examples = []
-    print(data_dir)
-    for filename in sorted(glob.glob(f"{data_dir}/*")):
-      with open(filename, "r") as f:
-        obj = json.load(f)
-        review_id = obj["metadata"]["review_id"]
-        for i, review_sentence in enumerate(obj["review_sentences"]):
-          examples.append(
-              Example(
-                  f"{review_id}|{i}",
-                  review_sentence["text"],
-                  get_label(review_sentence["pol"]),
-              ))
-    self.identifiers, self.texts, self.target_indices = zip(*examples)
-    self.targets = [
-        np.eye(2, dtype=np.float64)[int(i)] for i in self.target_indices
-    ]
+    (
+        self.identifiers,
+        _,
+        self.texts,
+        self.target_indices,
+    ) = classification_lib.get_features_and_labels(data_dir, get_labels=True)
+    self.targets = [EYE_2[int(i)] for i in self.target_indices]
     self.tokenizer = tokenizer
     self.max_len = max_len
 
@@ -114,24 +108,23 @@ class SentimentClassifier(nn.Module):
     return self.out(output)
 
 
-def create_data_loader(data_dir, subset, tokenizer):
+def create_data_loader(data_dir, tokenizer):
   ds = PolarityDetectionDataset(
-      f"{data_dir}/{subset}/",
+      data_dir,
       tokenizer=tokenizer,
   )
   return DataLoader(ds, batch_size=BATCH_SIZE, num_workers=4)
 
 
 def build_data_loaders(data_dir, tokenizer):
+  assert "train" in data_dir
   return (
       create_data_loader(
           data_dir,
-          "train",
           tokenizer,
       ),
       create_data_loader(
-          data_dir,
-          "dev",
+          data_dir.replace("train", "dev"),
           tokenizer,
       ),
   )
@@ -250,51 +243,44 @@ def do_train(tokenizer, model, loss_fn, data_dir):
 
 
 def do_eval(tokenizer, model, loss_fn, data_dir):
+  assert 'dev' in data_dir
   test_data_loader = create_data_loader(
       data_dir,
-      "dev",
       tokenizer,
   )
 
   model.load_state_dict(torch.load(f"ckpt/best_bert_model.bin"))
 
-  results = train_or_eval("eval",
+  dev_acc, dev_loss = train_or_eval("eval",
                           model,
                           test_data_loader,
                           loss_fn,
-                          DEVICE,
-                          return_preds=True)
+                          DEVICE)
 
-  identifiers = []
-  labels = []
-  for i, l in results:
-    identifiers += i
-    labels += l
-
-  with open(f"outputs/test_results.pkl", "wb") as f:
-    pickle.dump({"results": list(zip(identifiers, labels))}, f)
-
+  print("Dev accuracy", dev_acc)
 
 def do_predict(tokenizer, model, data_dir):
 
   model.load_state_dict(torch.load(f"ckpt/best_bert_model.bin"))
 
-  overall_predictions = {}
-  with open(f"{data_dir}/tokenized_examples.pkl", "rb") as f:
-    for review_id, examples in pickle.load(f).items():
-      predictions = collections.OrderedDict()
-      for example in examples:
-        encoded_review = tokenizer_fn(tokenizer, example["text"])
-        input_ids = encoded_review["input_ids"].to(DEVICE)
-        attention_mask = encoded_review["attention_mask"].to(DEVICE)
+  predictions = {}
+  with open(f"{data_dir}/features.jsonl", "r") as f:
+    for line in f:
+      example = json.loads(line)
+      encoded_review = tokenizer_fn(tokenizer, example["text"])
+      input_ids = encoded_review["input_ids"].to(DEVICE)
+      attention_mask = encoded_review["attention_mask"].to(DEVICE)
 
-        output = model(input_ids, attention_mask)
-        _, prediction = torch.max(output, dim=1)
-        predictions[example["identifier"]] = prediction.item()
-      overall_predictions[review_id] = predictions
+      output = model(input_ids, attention_mask)
+      _, prediction = torch.max(output, dim=1)
+      predictions[example["identifier"]] = prediction.item()
 
-  with open(f"{data_dir}/bert_results.json", "w") as f:
-    json.dump(overall_predictions, f)
+  with open(f"{data_dir}/bert_predictions.jsonl", "w") as f:
+    for identifier, pred in predictions.items():
+      f.write(json.dumps({
+        "identifier": identifier,
+        "label": pred,
+      }) + "\n")
 
 
 def main():

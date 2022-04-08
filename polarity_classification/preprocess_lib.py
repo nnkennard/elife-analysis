@@ -2,6 +2,7 @@ import collections
 import json
 import stanza
 
+
 class Node(object):
 
   def __init__(self, my_id, head, deprel, pos):
@@ -38,13 +39,13 @@ def extract_dep_paths(sentence, max_len=2):
     curr_node = stack.pop(0)
     for child in curr_node.children:
       if curr_node.my_id:
-        features.append(
-            "_".join([curr_node.deprel, curr_node.pos, child.deprel, child.pos]))
+        features.append("_".join(
+            [curr_node.deprel, curr_node.pos, child.deprel, child.pos]))
       stack.append(child)
   return features
 
 
-#def get_nsubj_subtree(sentence):
+# def get_nsubj_subtree(sentence):
 #  dep_tree_root = build_dep_tree(sentence)
 #  (actual_root,) = dep_tree_root.children
 #  for child in actual_root.children:
@@ -58,11 +59,10 @@ def extract_dep_paths(sentence, max_len=2):
 #        print("-" * 80 + "\n")
 
 
-
-
 def get_json_obj(filename):
   with open(filename, "r") as f:
     return json.load(f)
+
 
 def make_identifier(review_id, index):
   return f"{review_id}|||{index}"
@@ -73,14 +73,14 @@ def split_identifier(identifier):
   assert len(pieces) == 2
   return pieces
 
+
 SENTENCIZE_PIPELINE = stanza.Pipeline("en", processors="tokenize")
 STANZA_PIPELINE = stanza.Pipeline("en",
                                   processors="tokenize,lemma,pos,depparse",
                                   tokenize_no_ssplit=True)
 
+
 def featurize_sentence(sentence):
   annotated = STANZA_PIPELINE(sentence)
   assert len(annotated.sentences) == 1
-  return dict(collections.Counter(
-              extract_dep_paths(annotated.sentences[0])))
-
+  return dict(collections.Counter(extract_dep_paths(annotated.sentences[0])))

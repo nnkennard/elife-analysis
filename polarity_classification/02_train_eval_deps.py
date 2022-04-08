@@ -11,7 +11,6 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.feature_extraction import DictVectorizer
 from sklearn.pipeline import Pipeline
 
-
 parser = argparse.ArgumentParser(description="Create examples for WS training")
 parser.add_argument(
     "-d",
@@ -48,10 +47,10 @@ def unused_do_analyze():
 
 def do_train(data_dir):
 
-  assert 'train' in data_dir
+  assert "train" in data_dir
 
   _, features, _, labels = classification_lib.get_features_and_labels(
-    data_dir, get_labels=True)
+      data_dir, get_labels=True)
 
   pipe = Pipeline([
       ("vectorizer", DictVectorizer(sparse=False)),
@@ -63,23 +62,24 @@ def do_train(data_dir):
 
 
 def do_eval(data_dir):
-  assert 'dev' in data_dir
+  assert "dev" in data_dir
   _, features, _, labels = classification_lib.get_features_and_labels(
-    data_dir, get_labels=True)
+      data_dir, get_labels=True)
   pipe = joblib.load(DEP_CLASSIFIER_PATH)
   print("Dev accuracy", pipe.score(features, labels))
 
 
 def do_predict(data_dir):
   identifiers, features, _, _ = classification_lib.get_features_and_labels(
-    data_dir, get_labels=False)
+      data_dir, get_labels=False)
   pipe = joblib.load(DEP_CLASSIFIER_PATH)
-  with open(f'{data_dir}/dep_predictions.jsonl', 'w') as f:
+  with open(f"{data_dir}/dep_predictions.jsonl", "w") as f:
     for identifier, label in zip(identifiers, pipe.predict(features)):
-      f.write(json.dumps({
-      "identifier": identifier,
-      "label": int(label),
-      }) + "\n")
+      f.write(
+          json.dumps({
+              "identifier": identifier,
+              "label": int(label),
+          }) + "\n")
 
 
 def main():
