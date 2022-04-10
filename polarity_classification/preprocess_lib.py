@@ -55,7 +55,8 @@ def get_nsubj_subtree(sentence_text):
       grandchild_indices = [x.my_id for x in child.children]
       if grandchild_indices:
         min_idx, max_idx = min(grandchild_indices), max(grandchild_indices)
-        nps.append(" ".join([x.text for x in sentence.tokens[min_idx:max_idx + 1]]))
+        nps.append(" ".join(
+            [x.text for x in sentence.tokens[min_idx:max_idx + 1]]))
   return nps
 
 
@@ -75,16 +76,18 @@ def split_identifier(identifier):
 
 
 SENTENCIZE_PIPELINE = stanza.Pipeline("en", processors="tokenize")
-STANZA_PIPELINE = stanza.Pipeline("en",
-                                  processors="tokenize,lemma,pos,depparse,constituency",
-                                  tokenize_no_ssplit=True)
+STANZA_PIPELINE = stanza.Pipeline(
+    "en",
+    processors="tokenize,lemma,pos,depparse,constituency",
+    tokenize_no_ssplit=True)
+
 
 def process_sentence(sentence_text):
   return STANZA_PIPELINE(sentence_text).sentences[0]
 
+
 def get_maximal_nps(sentence_text):
   np_spans = []
-  print(dir(process_sentence(sentence_text)))
   stack = [process_sentence(sentence_text).constituency]
   while stack:
     this_tree = stack.pop(0)

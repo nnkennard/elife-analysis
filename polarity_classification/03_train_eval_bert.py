@@ -243,7 +243,7 @@ def do_train(tokenizer, model, loss_fn, data_dir):
 
 
 def do_eval(tokenizer, model, loss_fn, data_dir):
-  assert 'dev' in data_dir
+  assert "dev" in data_dir
   test_data_loader = create_data_loader(
       data_dir,
       tokenizer,
@@ -251,13 +251,11 @@ def do_eval(tokenizer, model, loss_fn, data_dir):
 
   model.load_state_dict(torch.load(f"ckpt/best_bert_model.bin"))
 
-  dev_acc, dev_loss = train_or_eval("eval",
-                          model,
-                          test_data_loader,
-                          loss_fn,
-                          DEVICE)
+  dev_acc, dev_loss = train_or_eval("eval", model, test_data_loader, loss_fn,
+                                    DEVICE)
 
   print("Dev accuracy", dev_acc)
+
 
 def do_predict(tokenizer, model, data_dir):
 
@@ -278,8 +276,8 @@ def do_predict(tokenizer, model, data_dir):
   with open(f"{data_dir}/bert_predictions.jsonl", "w") as f:
     for identifier, pred in predictions.items():
       f.write(json.dumps({
-        "identifier": identifier,
-        "label": pred,
+          "identifier": identifier,
+          "label": pred,
       }) + "\n")
 
 
