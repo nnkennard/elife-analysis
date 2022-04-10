@@ -45,18 +45,18 @@ def extract_dep_paths(sentence, max_len=2):
   return features
 
 
-# def get_nsubj_subtree(sentence):
-#  dep_tree_root = build_dep_tree(sentence)
-#  (actual_root,) = dep_tree_root.children
-#  for child in actual_root.children:
-#    if child.deprel == "nsubj":
-#      grandchild_indices = [x.my_id for x in child.children]
-#      if grandchild_indices:
-#        min_idx, max_idx = min(grandchild_indices), max(grandchild_indices)
-#        print(sentence.text)
-#        print()
-#        print(" ".join([x.text for x in sentence.tokens[min_idx:max_idx + 1]]))
-#        print("-" * 80 + "\n")
+def get_nsubj_subtree(sentence_text):
+  sentence = process_sentence(sentence_text)
+  dep_tree_root = build_dep_tree(sentence)
+  (actual_root,) = dep_tree_root.children
+  nps = []
+  for child in actual_root.children:
+    if child.deprel == "nsubj":
+      grandchild_indices = [x.my_id for x in child.children]
+      if grandchild_indices:
+        min_idx, max_idx = min(grandchild_indices), max(grandchild_indices)
+        nps.append(" ".join([x.text for x in sentence.tokens[min_idx:max_idx + 1]]))
+  return nps
 
 
 def get_json_obj(filename):
@@ -71,13 +71,28 @@ def make_identifier(review_id, index):
 def split_identifier(identifier):
   pieces = identifier.split("|||")
   assert len(pieces) == 2
-  return pieces
+  return pieces[0], int(pieces[1])
 
 
 SENTENCIZE_PIPELINE = stanza.Pipeline("en", processors="tokenize")
 STANZA_PIPELINE = stanza.Pipeline("en",
-                                  processors="tokenize,lemma,pos,depparse",
+                                  processors="tokenize,lemma,pos,depparse,constituency",
                                   tokenize_no_ssplit=True)
+
+def process_sentence(sentence_text):
+  return STANZA_PIPELINE(sentence_text).sentences[0]
+
+def get_maximal_nps(sentence_text):
+  np_spans = []
+  print(dir(process_sentence(sentence_text)))
+  stack = [process_sentence(sentence_text).constituency]
+  while stack:
+    this_tree = stack.pop(0)
+    if this_tree.label == "NP":
+      np_spans.append(" ".join(this_tree.leaf_labels()))
+    else:
+      stack += this_tree.children
+  return np_spans
 
 
 def featurize_sentence(sentence):
