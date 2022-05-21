@@ -1,6 +1,6 @@
 # Similarity
 
-We should be able to use similarity code for both salience (between review and manuscript) and consonaance (between reviews).
+We should be able to use similarity code for both salience (between review and manuscript) and consonance (between reviews).
 
 Since we don't have gold labels for salience, I will test salience models on DISAPERE review-rebuttal pairs.
 
@@ -9,35 +9,31 @@ Input: json files in the format:
 
 ```
 {
+  "review_id" : <review_id>,
+  "manuscript_id": <manuscript_id>,
   "review_sentences": [
-    "review sentence 1",
-    "review sentence 2", ...
+    <review_sentence_1>,
+    <review_sentence_2>, ...
   ],
   "rebuttal_sentences": [
-    "rebuttal sentence 1",
-    "rebuttal sentence 2", ...
+    <rebuttal_sentence_1>,
+    <rebuttal_sentence_2>, ...
   ],
-  "review_rebuttal_alignment": [
-    [
-      0,
-      0,
-      1, ...
-    ],
-    [
-      1,
-      0,
-      1, ...
-    ]
+  "review_rebuttal_alignment": <alignment_array>
   ]"manuscript_sentences": {
-    "section 1 title": [
-      "section 1 sentence 1",
-      "section 1 sentence 2", ...
+    <section_1_title>: [
+      <section_1_sentence_1>,
+      <section_1_sentence_2>, ...
     ],
-    "section 2 title": [
-      "section 2 sentence 1",
-      "section 2 sentence 2", ...
+    <section_2_title>: [
+      <section_2_sentence_1>,
+      <section_2_sentence_2>, ...
     ], ...
-    
   }
 }
 ```
+
+Baseline: just run similarity, sum over pairwise similarities of sentences. This shouldn't work too well.
+Similarity measures:
+* S-BERT?
+* Arora?
