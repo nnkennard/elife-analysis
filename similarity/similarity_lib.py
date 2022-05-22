@@ -20,6 +20,7 @@ def sbert(sentences_1, sentences_2):
   for i, e1 in enumerate(embeddings_1):
     for j, e2 in enumerate(embeddings_2):
       results[i][j] = cosine(e1, e2)
+  return results.tolist()
 
 
 def jaccard_tokenize(sentences):
@@ -40,7 +41,7 @@ def jaccard(sentences_1, sentences_2):
   for i, t1 in enumerate(tokens_1):
     for j, t2 in enumerate(tokens_2):
       results[i][j] = jaccard_similarity(t1, t2)
-  return results
+  return results.tolist()
 
 
 FUNCTION_MAP = {"sbert": sbert, "jaccard": jaccard}
