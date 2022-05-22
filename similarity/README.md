@@ -36,6 +36,22 @@ Input: json files in the format:
 
 If review and/or rebuttal text is already sentence tokenized, separate sentences with `"\n\n"` to skip application of the sentence separation model.
 
+The tokenization script results in a modified file, with the format:
+
+```
+{
+  "structures": ... (same as before),
+  "manuscript_files": ... (same as before),
+  "tokenized_manuscripts":  "manuscript_files": [
+    {
+      "forum_id": <forum_id>,
+      "tokenized_manuscript": {
+        <section_1_name>: 
+      },
+      
+    },
+}
+```
 
 Baseline: just run similarity, sum over pairwise similarities of sentences. This shouldn't work too well.
 Similarity measures:
