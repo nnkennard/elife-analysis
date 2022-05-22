@@ -6,17 +6,29 @@ import openreview
 import numpy as np
 import tqdm
 
-
-
 parser = argparse.ArgumentParser(
-    description='Prepare DISAPERE data for similarity calculations')
-parser.add_argument('-d', '--disapere_path', default="../data/DISAPERE/final_dataset/",
-    type=str, help='path to DISAPERE final_dataset directory')
-parser.add_argument('-p', '--pdf_dir', default="pdfs/",
-    type=str, help='path to directory where pdfs will be saved')
-parser.add_argument('-o', '--output_file', default="disapere_similarity_input.json",
-    type=str, help='output json filename')
-
+    description="Prepare DISAPERE data for similarity calculations")
+parser.add_argument(
+    "-d",
+    "--disapere_path",
+    default="../data/DISAPERE/final_dataset/",
+    type=str,
+    help="path to DISAPERE final_dataset directory",
+)
+parser.add_argument(
+    "-p",
+    "--pdf_dir",
+    default="pdfs/",
+    type=str,
+    help="path to directory where pdfs will be saved",
+)
+parser.add_argument(
+    "-o",
+    "--output_file",
+    default="disapere_similarity_input.json",
+    type=str,
+    help="output json filename",
+)
 
 GUEST_CLIENT = openreview.Client(baseurl="https://api.openreview.net")
 Example = collections.namedtuple(

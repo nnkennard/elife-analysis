@@ -5,21 +5,32 @@ import stanza
 import tqdm
 import xml.etree.ElementTree as ET
 
-parser = argparse.ArgumentParser(
-    description='Prepare tokenized paper text')
-parser.add_argument('-i', '--input_file',
-default="disapere_similarity_input.json",
-    type=str, help='input json file')
-parser.add_argument('-x', '--xml_dir', default="xmls/",
-    type=str, help='path to xmls as parsed by grobid')
-parser.add_argument('-o', '--output_file', default="disapere_similarity_full.json",
-    type=str, help='output json filename')
-
-
-STANZA_PIPELINE = stanza.Pipeline(
-    "en",
-    processors="tokenize",
+parser = argparse.ArgumentParser(description="Prepare tokenized paper text")
+parser.add_argument(
+    "-i",
+    "--input_file",
+    default="disapere_similarity_input.json",
+    type=str,
+    help="input json file",
 )
+parser.add_argument(
+    "-x",
+    "--xml_dir",
+    default="xmls/",
+    type=str,
+    help="path to xmls as parsed by grobid",
+)
+parser.add_argument(
+    "-o",
+    "--output_file",
+    default="disapere_similarity_full.json",
+    type=str,
+    help="output json filename",
+)
+
+STANZA_PIPELINE = stanza.Pipeline("en",
+                                  processors="tokenize",
+                                  tokenize_no_ssplit=True)
 
 PREFIX = "{http://www.tei-c.org/ns/1.0}"
 TEXT_ID = f"{PREFIX}text"
@@ -52,11 +63,20 @@ def main():
 
   args = parser.parse_args()
 
-  with open(args.input_file, 'r') as f:
+  with open(args.input_file, "r") as f:
     input_obj = json.load(f)
 
   forums_to_get = [x["forum_id"] for x in input_obj["manuscript_files"]]
 
+  # Tokenize reviews and rebuttals
+  for structure in input_obj["structures"]:
+    for review in structure["reviews"]:
+      review["tokenized_review"] = sentence_tokenize(review["review_text"])
+      if review["rebuttal_text"] is not None:
+        review["tokenized_rebuttal"] = sentence_tokenize(
+            review["rebuttal_text"])
+
+  # Tokenize manuscripts
   input_obj["tokenized_manuscripts"] = []
   for filename in tqdm.tqdm(glob.glob(f"{args.xml_dir}/*.tei.xml")):
     forum_id = filename[5:-8]
@@ -65,10 +85,12 @@ def main():
     try:
       section_map = get_docs(filename)
       input_obj["tokenized_manuscripts"].append({
-        "forum_id": forum_id,
-        "tokenized_manuscript": {
-          title: sentence_tokenize(text) for title, text in section_map.items()
-      }})
+          "forum_id": forum_id,
+          "tokenized_manuscript": {
+              title: sentence_tokenize(text)
+              for title, text in section_map.items()
+          },
+      })
     except ValueError:
       print(f"Problem with {filename}")
 
