@@ -15,12 +15,11 @@ parser.add_argument(
 )
 parser.add_argument(
     "-o",
-    "--output_file",
-    default="disapere_review_manuscript_salience.json",
+    "--output_dir",
+    default="disapere_results/",
     type=str,
     help="output file",
 )
-
 
 def main():
 
@@ -30,8 +29,8 @@ def main():
     input_data = json.load(f)
 
   manuscript_text_map = {
-    x["forum_id"]:sum(x["tokenized_manuscript"].values(),[]) for x in
-    input_data["tokenized_manuscripts"]
+    x["forum_id"]:sum(x["manuscript_sentences"].values(),[]) for x in
+    input_data["manuscript_sentences"]
   }
 
   results = []
@@ -51,7 +50,7 @@ def main():
           },
       })
 
-  with open(args.output_file, "w") as f:
+  with open(f'{args.output_dir}/review_manuscript_salience.json', "w") as f:
     json.dump(results, f)
 
 

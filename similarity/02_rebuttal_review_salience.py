@@ -15,12 +15,11 @@ parser.add_argument(
 )
 parser.add_argument(
     "-o",
-    "--output_file",
-    default="disapere_rebuttal_review_salience.json",
+    "--output_dir",
+    default="disapere_results/",
     type=str,
     help="output file",
 )
-
 
 def main():
 
@@ -44,7 +43,7 @@ def main():
           },
       })
 
-  with open(args.output_file, "w") as f:
+  with open(f'{args.output_dir}/rebuttal_review_salience.json', "w") as f:
     json.dump(results, f)
 
 

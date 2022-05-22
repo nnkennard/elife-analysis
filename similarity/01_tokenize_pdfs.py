@@ -22,8 +22,8 @@ parser.add_argument(
 )
 parser.add_argument(
     "-o",
-    "--output_file",
-    default="disapere_similarity_full.json",
+    "--output_dir",
+    default="disapere_results/",
     type=str,
     help="output json filename",
 )
@@ -71,22 +71,22 @@ def main():
   # Tokenize reviews and rebuttals
   for structure in input_obj["structures"]:
     for review in structure["reviews"]:
-      review["tokenized_review"] = sentence_tokenize(review["review_text"])
+      review["review_sentences"] = sentence_tokenize(review["review_text"])
       if review["rebuttal_text"] is not None:
-        review["tokenized_rebuttal"] = sentence_tokenize(
+        review["rebuttal_sentences"] = sentence_tokenize(
             review["rebuttal_text"])
 
   # Tokenize manuscripts
-  input_obj["tokenized_manuscripts"] = []
+  input_obj["manuscript_sentences"] = []
   for filename in tqdm.tqdm(glob.glob(f"{args.xml_dir}/*.tei.xml")):
     forum_id = filename[5:-8]
     if forum_id not in forums_to_get:
       continue
     try:
       section_map = get_docs(filename)
-      input_obj["tokenized_manuscripts"].append({
+      input_obj["manuscript_sentences"].append({
           "forum_id": forum_id,
-          "tokenized_manuscript": {
+          "manuscript_sentences": {
               title: sentence_tokenize(text)
               for title, text in section_map.items()
           },
@@ -94,7 +94,7 @@ def main():
     except ValueError:
       print(f"Problem with {filename}")
 
-  with open(args.output_file, "w") as f:
+  with open(f'{args.output_file}/similarity_tokenized.json', "w") as f:
     json.dump(input_obj, f)
 
 

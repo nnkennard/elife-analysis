@@ -16,8 +16,8 @@ parser.add_argument(
 )
 parser.add_argument(
     "-o",
-    "--output_file",
-    default="disapere_review_review_consonance.json",
+    "--output_dir",
+    default="disapere_results/",
     type=str,
     help="output file",
 )
@@ -31,7 +31,7 @@ def main():
     input_data = json.load(f)
 
   results = []
-  for structure in tqdm.tqdm(input_data["structures"][:3]):
+  for structure in tqdm.tqdm(input_data["structures"]):
     if len(structure["reviews"]) == 1:
       continue
     for review_1, review_2 in itertools.combinations(structure["reviews"], 2):
@@ -48,7 +48,7 @@ def main():
           },
       })
 
-  with open(args.output_file, "w") as f:
+  with open(f'{args.output_dir}/review_review_consonance.json', "w") as f:
     json.dump(results, f)
 
 
