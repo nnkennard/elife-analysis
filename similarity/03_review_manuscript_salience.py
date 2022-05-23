@@ -7,13 +7,6 @@ import similarity_lib
 
 parser = argparse.ArgumentParser(description="Review-manuscript salience")
 parser.add_argument(
-    "-i",
-    "--input_file",
-    default="disapere_similarity_full.json",
-    type=str,
-    help="input json file",
-)
-parser.add_argument(
     "-o",
     "--output_dir",
     default="disapere_results/",
@@ -25,7 +18,7 @@ def main():
 
   args = parser.parse_args()
 
-  with open(args.input_file, "r") as f:
+  with open(f'{args.output_dir}/similarity_tokenized.json', "r") as f:
     input_data = json.load(f)
 
   manuscript_text_map = {
@@ -34,9 +27,9 @@ def main():
   }
 
   results = []
-  for structure in tqdm.tqdm(input_data["structures"][:3]):
+  for structure in tqdm.tqdm(input_data["structures"]):
     for review in structure["reviews"]:
-      review_sentences = review["tokenized_review"]
+      review_sentences = review["review_sentences"]
       manuscript_sentences = manuscript_text_map.get(structure["forum_id"], None)
       if manuscript_sentences is None:
         continue

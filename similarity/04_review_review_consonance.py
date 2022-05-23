@@ -8,13 +8,6 @@ import similarity_lib
 
 parser = argparse.ArgumentParser(description="Prepare tokenized paper text")
 parser.add_argument(
-    "-i",
-    "--input_file",
-    default="disapere_similarity_full.json",
-    type=str,
-    help="input json file",
-)
-parser.add_argument(
     "-o",
     "--output_dir",
     default="disapere_results/",
@@ -27,7 +20,7 @@ def main():
 
   args = parser.parse_args()
 
-  with open(args.input_file, "r") as f:
+  with open(f'{args.output_dir}/similarity_tokenized.json', "r") as f:
     input_data = json.load(f)
 
   results = []
@@ -35,8 +28,8 @@ def main():
     if len(structure["reviews"]) == 1:
       continue
     for review_1, review_2 in itertools.combinations(structure["reviews"], 2):
-      review_1_sentences = review_1["tokenized_review"]
-      review_2_sentences = review_2["tokenized_review"]
+      review_1_sentences = review_1["review_sentences"]
+      review_2_sentences = review_2["review_sentences"]
       results.append({
           "review_1_id": review_1["review_id"],
           "review_2_id": review_2["review_id"],

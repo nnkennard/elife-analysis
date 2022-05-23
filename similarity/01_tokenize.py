@@ -9,7 +9,7 @@ parser = argparse.ArgumentParser(description="Prepare tokenized paper text")
 parser.add_argument(
     "-i",
     "--input_file",
-    default="disapere_similarity_input.json",
+    default="intermediate.json",
     type=str,
     help="input json file",
 )
@@ -94,7 +94,7 @@ def main():
     except ValueError:
       print(f"Problem with {filename}")
 
-  with open(f'{args.output_file}/similarity_tokenized.json', "w") as f:
+  with open(f'{args.output_dir}/similarity_tokenized.json', "w") as f:
     json.dump(input_obj, f)
 
 
