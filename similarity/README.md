@@ -11,6 +11,8 @@ python -m pip install -r requirements.txt
 python -c "import stanza; stanza.download('en')"
 ```
 
+You will also need to install [grobid](https://grobid.readthedocs.io/en/latest/).
+
 ## Preparing input
 These scripts require input as a json file, with the format:
 
