@@ -99,6 +99,7 @@ def build_structures(examples):
 def main():
 
   args = parser.parse_args()
+  assert 'final_dataset' in args.disapere_path
 
   manuscript_list = []
   pdfs_downloaded = []
