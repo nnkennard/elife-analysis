@@ -1,5 +1,6 @@
 import argparse
 import collections
+import itertools
 import json
 import tqdm
 
@@ -14,6 +15,7 @@ parser.add_argument(
     help="output file",
 )
 
+
 def main():
 
   args = parser.parse_args()
@@ -23,20 +25,23 @@ def main():
 
   results = []
   for structure in tqdm.tqdm(input_data["structures"]):
-    for review in structure["reviews"]:
-      review_sentences = review["review_sentences"]
-      rebuttal_sentences = review["rebuttal_sentences"]
+    if len(structure["reviews"]) == 1:
+      continue
+    for review_1, review_2 in itertools.combinations(structure["reviews"], 2):
+      review_1_sentences = review_1["review_sentences"]
+      review_2_sentences = review_2["review_sentences"]
       results.append({
-          "review_id": review["review_id"],
-          "review_sentences": review_sentences,
-          "rebuttal_sentences": rebuttal_sentences,
+          "review_1_id": review_1["review_id"],
+          "review_2_id": review_2["review_id"],
+          "review_1_sentences": review_1_sentences,
+          "review_2_sentences": review_2_sentences,
           "result": {
-              fn_name: fn(review_sentences, rebuttal_sentences)
+              fn_name: fn(review_1_sentences, review_2_sentences)
               for fn_name, fn in similarity_lib.FUNCTION_MAP.items()
           },
       })
 
-  with open(f'{args.output_dir}/rebuttal_review_salience.json', "w") as f:
+  with open(f'{args.output_dir}/review_review_consonance.json', "w") as f:
     json.dump(results, f)
 
 
