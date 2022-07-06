@@ -1,0 +1,1536 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TEI xml:space="preserve" xmlns="http://www.tei-c.org/ns/1.0" 
+xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+xsi:schemaLocation="http://www.tei-c.org/ns/1.0 https://raw.githubusercontent.com/kermitt2/grobid/master/grobid-home/schemas/xsd/Grobid.xsd"
+ xmlns:xlink="http://www.w3.org/1999/xlink">
+	<teiHeader xml:lang="en">
+		<fileDesc>
+			<titleStmt>
+				<title level="a" type="main">Under review as a conference paper at ICLR 2019 NEURAL CAUSAL DISCOVERY WITH LEARNABLE IN-PUT NOISE</title>
+			</titleStmt>
+			<publicationStmt>
+				<publisher/>
+				<availability status="unknown"><licence/></availability>
+			</publicationStmt>
+			<sourceDesc>
+				<biblStruct>
+					<analytic>
+						<title level="a" type="main">Under review as a conference paper at ICLR 2019 NEURAL CAUSAL DISCOVERY WITH LEARNABLE IN-PUT NOISE</title>
+					</analytic>
+					<monogr>
+						<imprint>
+							<date/>
+						</imprint>
+					</monogr>
+				</biblStruct>
+			</sourceDesc>
+		</fileDesc>
+		<encodingDesc>
+			<appInfo>
+				<application version="0.7.1" ident="GROBID" when="2022-05-22T23:20+0000">
+					<desc>GROBID - A machine learning software for extracting information from scholarly documents</desc>
+					<ref target="https://github.com/kermitt2/grobid"/>
+				</application>
+			</appInfo>
+		</encodingDesc>
+		<profileDesc>
+			<abstract>
+<div xmlns="http://www.tei-c.org/ns/1.0"><p>Learning causal relations from observational time series with nonlinear interactions and complex causal structures is a key component of human intelligence, and has a wide range of applications. Although neural nets have demonstrated their effectiveness in a variety of fields, their application in learning causal relations has been scarce. This is due to both a lack of theoretical results connecting risk minimization and causality (enabling function approximators like neural nets to apply), and a lack of scalability in prior causal measures to allow for expressive function approximators like neural nets to apply. In this work, we propose a novel causal measure and algorithm using risk minimization to infer causal relations from time series. We demonstrate the effectiveness and scalability of our algorithms to learn nonlinear causal models in synthetic datasets as comparing to other methods, and its effectiveness in inferring causal relations in a video game environment and real-world heart-rate vs. breath-rate and rat brain EEG datasets.</p></div>
+			</abstract>
+		</profileDesc>
+	</teiHeader>
+	<text xml:lang="en">
+		<body>
+<div xmlns="http://www.tei-c.org/ns/1.0"><head n="1">INTRODUCTION</head><p>From an early age, humans have a remarkable ability to infer causal relations from pure observations <ref type="bibr" target="#b57">(White &amp; Milne (1997)</ref>; <ref type="bibr" target="#b47">Scholl &amp; Tremoulet (2000)</ref>; <ref type="bibr" target="#b4">Buchsbaum et al. (2012))</ref>. By observing that a left dot moving towards a right dot and the right dot moves correspondingly (the launching effect, see <ref type="bibr">Michotte (1963)</ref>), a human can quickly infer that the left dot causes the right dot to move <ref type="bibr" target="#b47">(Scholl &amp; Tremoulet (2000)</ref>). In fact, much of our way of thinking is via cause and effect. Causal analysis also permits counterfactual reasoning, answering what would have happened if the cause had happened differently. The learning of causality also constitutes much of the scientific endeavor, for example finding the cause of a certain cancer <ref type="bibr" target="#b2">(Bosch et al. (2002)</ref>), or discovering gene regulatory networks <ref type="bibr" target="#b31">(Lozano et al. (2009)</ref>). In addition, causality plays a key role in neuroscience <ref type="bibr" target="#b38">(Neves et al. (2008)</ref>; <ref type="bibr" target="#b49">Seth et al. (2015)</ref>), economics (e.g. <ref type="bibr" target="#b13">Granger (1969)</ref>; <ref type="bibr" target="#b52">Stock &amp; Watson (1989)</ref>) and finance <ref type="bibr" target="#b17">(Hiemstra &amp; Jones (1994)</ref>; <ref type="bibr" target="#b14">Granger et al. (2000)</ref>).</p><p>The study of causality has a long history, yet the application of neural nets to learning causal relations has been scarce. There have been various works that propose methods to infer causal structures with limited model space (e.g. <ref type="bibr" target="#b13">Granger (1969)</ref>) which may not be able to model complex nonlinear causal relations, or propose measures to quantify causal strength (e.g. <ref type="bibr" target="#b48">Schreiber (2000)</ref>; <ref type="bibr" target="#b21">Janzing et al. (2013)</ref>) that may not scale to high-dimensional data. For these, the use of universal function approximators like neural nets may be beneficial in inferring causality, which motivate us to propose causal measures that are not only theoretically founded, but also amenable to the learning of function approximators. On the other hand, in the deep learning community, the learning of causal models has not been prevalent, in part due to the lack of theoretical understanding between learning a prediction model and learning a causal model. This also motivates us to propose causal measures, obtained via learning a prediction model, that can deduce causality.</p><p>The contributions of this work are as follows:</p><p>? We propose a novel measure to quantify causality from observational data, and an effective algorithm, Causal Inference with Learnable Noise (CILN), to estimate it. It is based on minimizing a learnable noise risk of a prediction model, allowing function approximators such as neural nets to learn complex causal relationships.</p><p>? We demonstrate on nonlinear synthetic datasets that our method outperforms other causal measures by a large margin, and can scale to a larger number of time series. We also demonstrate that our models are effective on real-world datasets.</p></div>
+<div xmlns="http://www.tei-c.org/ns/1.0"><head n="2">RELATED WORK</head><p>The study of causality has a long history, and has been approached from different perspectives. Pearl (e.g. <ref type="bibr" target="#b40">Pearl (2002;</ref><ref type="bibr">2009)</ref>; <ref type="bibr">Pearl et al. (2009)</ref>) defines causality in terms of intervention and structural dependence, under the structural equation models (SEM). Granger <ref type="bibr" target="#b13">(Granger (1969)</ref>; <ref type="bibr" target="#b12">Granger &amp; Newbold (1986)</ref>) defines causality via prediction: if the prediction of Y via a linear model can be improved by including the information of X, then X causes Y in the Granger sense. Since its proposal, Granger causality has been widely applied in economics (e.g. <ref type="bibr" target="#b22">Joerding (1986)</ref>) and neuroscience (e.g. <ref type="bibr" target="#b8">Deshpande et al. (2009)</ref>; <ref type="bibr" target="#b49">Seth et al. (2015)</ref>). To learn nonlinear causal relations, later works also extend Granger causality to kernel methods <ref type="bibr">(Ancona et al. (2004)</ref>; <ref type="bibr" target="#b32">Marinazzo et al. (2008a;</ref><ref type="bibr" target="#b49">b)</ref>; <ref type="bibr" target="#b50">Sindhwani et al. (2012)</ref>). To clear up the relations between these two notions of causality, <ref type="bibr" target="#b56">White et al. (2011)</ref> provide conditions under which Granger causality can deduce direct structural causality in a general settable system framework <ref type="bibr" target="#b54">(White &amp; Chalak (2009)</ref>), with direct structural causality as a natural extension of Pearl causality in settable systems. Our method also utilizes the high-level idea of inferring causal relations via prediction, and building on the work of <ref type="bibr" target="#b56">White et al. (2011)</ref> we propose a novel measure that can likely uncover direct structural causality under certain conditions.</p><p>Numerous methods have been proposed to discover causal structures from data. One important class is constraint-based methods, for example PC <ref type="bibr" target="#b51">(Spirtes et al. (2000)</ref>), rankPC <ref type="bibr" target="#b15">(Harris &amp; Drton (2013)</ref>), IC <ref type="bibr" target="#b40">(Pearl (2002)</ref>), and FCI <ref type="bibr" target="#b51">(Spirtes et al. (2000)</ref>), which require repetitive conditional independence tests. Hybrid methods, e.g. MMHC <ref type="bibr" target="#b53">(Tsamardinos et al. (2006)</ref>), require repetitive estimation of conditional association score (e.g. using conditional mutual information). In comparison, under the scope of time series, our method can simultaneously discover multiple variables that directly cause the variable of interest. Score-based methods search for the structure that yields the optimal score w.r.t. the data, generally using greedy search methods, for example GES (Chickering ( <ref type="formula">2002</ref>)), rankGES <ref type="bibr" target="#b37">(Nandy et al. (2018)</ref>) and GIES <ref type="bibr" target="#b16">(Hauser &amp; B?hlmann (2012)</ref>). This in general requires ?(N 2 ) steps (N denoting the number of nodes in the graph), and the number of neighboring states may grow very large at each step. In comparison, our method only requires training N models for causal discovery with time series.</p><p>In addition, various measures have been proposed to quantify causality. <ref type="bibr" target="#b48">Schreiber (2000)</ref> proposes transfer entropy as a measure for causality. It measures the mutual information between the current Y and the past of X, conditioned on the past of Y, to quantify the directional information transfer.</p><p>As noted in <ref type="bibr" target="#b32">Marinazzo et al. (2008a)</ref>, Granger causality as defined in <ref type="bibr" target="#b12">Granger &amp; Newbold (1986)</ref> implies nonzero transfer entropy. <ref type="bibr" target="#b21">Janzing et al. (2013)</ref> analyze several causal measures, and conclude that they are unsatisfactory measures of causal strength. They then propose causal influence, defined via the KL-divergence between the original joint distribution and the distribution with a set of causal arrows broken. We note that both the calculation of transfer entropy and causal influence requires density estimation of the full joint distributions of the input and output, which could easily become difficult in high dimensions. This motivates us to propose new causal measures based on risk minimization, which is much easier with high input dimensions. Besides, various other works have also proposed methods to infer causal structure under some specific conditions, for example, causal additive noise models <ref type="bibr" target="#b19">(Hoyer et al. (2009)</ref>), information-geometric causal inference <ref type="bibr" target="#b6">(Daniusis et al. (2012)</ref>; <ref type="bibr">Janzing et al. (2012)</ref>), dynamic causal modeling <ref type="bibr" target="#b11">(Friston et al. (2003)</ref>), etc.</p><p>There has also been works that approach causality from a machine learning perspective, or have architectures that put causality to mind. <ref type="bibr" target="#b29">Lopez-Paz et al. (2015)</ref> study causal inference as a supervised learning problem, where the pairwise causal directions are given as labels for training. <ref type="bibr" target="#b30">Louizos et al. (2017)</ref> utilize a variational autoencoder (VAE) structure to estimate the unknown latent space summarizing the confounders and the causal effect. <ref type="bibr" target="#b25">Kipf et al. (2018)</ref> propose a neural relational inference architecture, which simultaneously infers the interactions and learning the dynamics from observational data. Designing causal inference into the model architecture can also be beneficial in certain applications. For example, <ref type="bibr" target="#b23">Kansky et al. (2017)</ref> propose a Schema Network that allows re-gression planning from a goal through causal chains, and demonstrates zero-shot learning in a suite of variations of Atari Breakout games.</p><p>Our method also relates to sparse learning/feature selection methods, for example L1 regularization and group L1 regularization (e.g. <ref type="bibr" target="#b34">Meier et al. (2008)</ref>; <ref type="bibr" target="#b46">Scardapane et al. (2017)</ref>). Although L1 or group L1 regularization encourage sparsity in the weights of neural nets, the regularization is model and input dependent, in contrast to our method's invariance to model structure change and inputs rescaling. For example, a three-layer linear network and a collapsed one-layer linear network representing the same function can induce different L1 regularizations. For another example, if one of the input time series is scaled by a factor of 0.1 while other variables remain unchanged, the L1 regularization will be different due to a differently learned model. In comparison, our learnable noise risk when minimized is invariant to the above two kinds of changes, making it especially suitable to discover causality where the scale of different time series may span orders of magnitude, and the model structure may vary, as demonstrated in Section 4.1.</p></div>
+<div xmlns="http://www.tei-c.org/ns/1.0"><head n="3">METHOD</head></div>
+<div xmlns="http://www.tei-c.org/ns/1.0"><head n="3.1">PROBLEM DEFINITION</head><p>Although causal data can be inferred from observations at individual time points, we are primarily concerned with time series. Time series have extra structure that is particularly useful for causal inference: causes must precede their effects. Therefore, we consider N time series x (1) , x (2) , ...x (N ) , where each time series</p><formula xml:id="formula_0">x (i) = (x (i) 1 , x (i) 2 , ...x (i) t , ...) and each x (i) t ? R M is an M -dimensional vector. Denote X (i) t?1 = (x (i) t?K , x (i) t?K+1 , ...x (i) t?1 ) with maximum time horizon of K, and X t?1 = {X (i) t?1 }, i = 1, 2, ...N . We also denote X ( ?) t?1 = X t?1 \X (j) t?1 , i.e. X t?1 ex- cluding X (j)</formula><p>t?1 , to notationally differentiate with the variable of interest X (j) t?1 . We assume that the time series is generated by a canonical settable system <ref type="bibr" target="#b56">(White et al. (2011)</ref>). We adopt the settable system <ref type="bibr" target="#b54">(White &amp; Chalak (2009)</ref>) paradigm due to the following reasons: (1) as a natural extension to SEMs, it facilitates optimization, equilibrium, and learning; (2) it can formally link Granger causality with Pearl causality; (3) it is general enough to encompass a large number of practical scenarios, including time series. Intuitively, each variable in a settable system can either be determined by direct setting (which formalizes interventions), or by a response function on the settings of other variables. A canonical settable system is a settable system where each variable's setting equals its response, allowing the system to evolve naturally without intervention, formalizing time series. In this paper, we also assume causal sufficiency <ref type="bibr" target="#b42">(Peters et al. (2017)</ref>), i.e., each time series x (i) can only be structurally caused by the time series from x (1) , x (2) , ...x (N ) , and generated by stationary response functions h i that are unknown to the learner:</p><formula xml:id="formula_1">? ? ? ? ? ? ? ? ? x (1) t := h 1 (X t?1 , u 1 ) x (2) t := h 2 (X t?1 , u 2 ) ... x (N ) t := h N (X t?1 , u N ) (1) for t = K + 1, K + 2, ... . Here u i ? R M , i = 1, 2, ...N are noise variables that are mutually independent, are independent of any X (i) t?1 , x (i)</formula><p>t , i ? {1, 2, ...N }, and are effective arguments of the response functions h i . Also in this paper, we only consider "causality in mean", i.e. the causal relations, if exists, influence the mean value of other variables. For any i, j ? {1, 2, ...N }, we assume that the variables (X</p><formula xml:id="formula_2">( ?) t?1 , X (j) t?1 , x (i) t ) have probability density function P (X ( ?) t?1 , X (j) t?1 , x (i)</formula><p>t ). We will leave time series with hidden variables (therefore confounding can occur) for future work. We note that even without considering hidden variables, Eq. 1 is very general and already encompasses a wide range of scenarios.</p><p>In order to state the goal of the learner who wants to learn causality from the observations x (1) , x (2) , ...x (N ) , we need to rigorously define causality. Here, we restate the definitions of direct structural causality <ref type="bibr" target="#b56">(White et al. (2011)</ref>) and Granger causality <ref type="bibr" target="#b12">(Granger &amp; Newbold (1986)</ref>) using our notations of the system Eq. 1, the former being a natural extension to Pearl causality <ref type="bibr">(Pearl (2009)</ref>) in the settable systems.</p><p>Direct structural causality <ref type="bibr" target="#b56">(White et al. (2011))</ref> We say X <ref type="bibr" target="#b13">Granger (1969)</ref> defines causality in terms of conditional expectations. Later, <ref type="bibr" target="#b12">Granger &amp; Newbold (1986)</ref> define it using conditional distributions. We use the latter definition, since it is more general, and also facilitates connection with direct structural causality, and the algorithms proposed in this paper. In this work, we only consider causality between different time series, i.e. requiring j = i as default.</p><formula xml:id="formula_3">(j) t?1 , j = i does not directly struc- turally cause x (i) t , if for all possible values of X ( ?) t?1 and u l , l ? 1, 2, ...N , the function X (j) t?1 ? h i (X t?1 , u i ) is constant in X (j) t?1 . Otherwise, we say X (j) t?1 directly structurally causes x (i) t .</formula><p>Granger causality <ref type="bibr" target="#b12">(Granger &amp; Newbold (1986)</ref>) We say X</p><formula xml:id="formula_4">(j) t?1 , j = i does not Granger-cause x (i) t , if P (x (i) t |X (j) t?1 , X ( ?) t?1 ) = P (x (i) t |X ( ?) t?1 ), i.e. the conditional distribution function of x (i) t given X (j) t?1 , X ( ?) t?1 is identical to the conditional distribution function of x (i) t given X ( ?) t?1 . Otherwise, we say X (j) t?1 Granger-causes x (i) t .</formula><p>The goal of the learner is, given only x (1) , x (2) , ...x (N ) , determine for any x</p><formula xml:id="formula_5">(i) t , whether X (j) t?1 di- rectly structurally causes x (i)</formula><p>t for each j = 1, 2, ...N .</p></div>
+<div xmlns="http://www.tei-c.org/ns/1.0"><head n="3.2">GRANGER CAUSALITY IMPLIES DIRECT STRUCTURAL CAUSALITY IN EQ. (1)</head><p>For our system Eq. ( <ref type="formula">1</ref>), applying the results by <ref type="bibr" target="#b56">White et al. (2011)</ref>, we have that Granger causality is a sufficient condition for direct structural causality. See Appendix A for the detailed theorem and proof.</p><p>For system Eq. 1, for any i</p><formula xml:id="formula_6">, j ? {1, 2, ...N }, i = j, if X (j) t?1 Granger-causes x (i) t , then X (j) t?1 directly structurally causes x (i) t .</formula><p>The reason that here Granger causality can deduce direct structural causality is in part due to the fact that for system Eq. ( <ref type="formula">1</ref>), conditional exogeneity <ref type="bibr" target="#b56">(White et al. (2011)</ref>) is automatically satisfied by the assumptions of the system.</p><p>Note that the reverse of the statement is not true, i.e. Granger non-causality does not necessarily imply direct structural non-causality <ref type="bibr" target="#b55">(White &amp; Lu (2010)</ref> give several examples). They also note that these instances are exceptional, in that mild perturbations to their structures destroy the Granger non-causality.</p></div>
+<div xmlns="http://www.tei-c.org/ns/1.0"><head n="3.3">OUR METHOD</head><p>Based on section 3.2, if we have an algorithm that can deduce Granger causality in system Eq. ( <ref type="formula">1</ref>), then we can immediately deduce direct structural causality. In general, a direct test of Granger causality is difficult. In particular, when the number of time series is large or the dimension M of each time series is large, density or mutual information-based methods like transfer entropy (I(x <ref type="bibr" target="#b48">Schreiber (2000)</ref>), may not give a good estimate. Alternatively, various works have resorted to testing whether the prediction of</p><formula xml:id="formula_7">(i) t ; X (j) t?1 |X ( ?) t?1 ), see</formula><formula xml:id="formula_8">x (i) t given X (j) t?1 , X ( ?) t?1 is better than given only X ( ?)</formula><p>t?1 , under some limited functional space. For example, in his original work, <ref type="bibr" target="#b13">Granger (1969)</ref> investigates causality with linear function predictors. Later works have extended it to kernel methods, e.g., <ref type="bibr">Ancona et al. (2004)</ref>; <ref type="bibr" target="#b32">Marinazzo et al. (2008a;</ref><ref type="bibr" target="#b49">b)</ref>; <ref type="bibr" target="#b50">Sindhwani et al. (2012)</ref>, which essentially estimate linear Granger causality on the feature space of the kernel.</p><p>To enable causal learning with potentially highly nonlinear response functions, it may be desirable to use universal function approximators <ref type="bibr" target="#b18">(Hornik (1991)</ref>) such as neural nets. As the main contribution of this paper, we will provide a novel causal measure and corresponding algorithm to estimate it. The measure is based on optimizing an objective containing a function approximator, thus allowing neural nets to apply.</p><p>Our algorithm is inspired by asking a counterfactual question during the learning of a prediction model. Specifically, it asks:</p><formula xml:id="formula_9">Algorithm 1 Causal Inference with Learnable Noise (CILN) Require x (i) t , X t?1 , for i ? {1, 2, ...N }, t ? T = {K + 1, K + 2, ...}.</formula><p>Require ? 0 : a small value for initialization of ?. Require ?: coefficient for the mutual information term. 1: for i in {1, 2, ...N } do: 2:</p><p>Initialize function approximator f ? . 3:</p><p>Initialize ? = (? 1 , ? 2 , ...? N ) = (? 0 1, ? 0 1, ...? 0 1), where each element ? 0 1 is a KM ? dimensional vector, same dimension as X (j)</p><formula xml:id="formula_10">t?1 . 4: (f ? * , ? * ) ? Minimize (f ? ,?) RX,x (i) , [f ? , ?] (Eq. 4</formula><p>) with e.g. gradient descent 5: To give a quantitative answer to this question, we define a learnable noise risk:</p><formula xml:id="formula_11">W ji ? I( X(j)(? * j ) t?1 ; X (j) t?1 ), for j = 1,</formula><formula xml:id="formula_12">R X,x (i) [f ? , ?] = E Xt?1,x (i) t , x (i) t ? f ? ( X(?) t?1 ) 2 + ? ? N j=1 I( X(j)(?j) t?1 ; X (j) t?1 )<label>(2)</label></formula><p>where</p><formula xml:id="formula_13">X(?) t?1 := X t?1 + ? (or element-wise, X(j)(?j) t?1 := X (j) t?1 + ? j ? j , j = 1, 2, ...N</formula><p>) is the noise-corrupted inputs with learnable noise amplitudes ? j ? R KM , and j ? N (0, I). ? &gt; 0 is a positive hyperparameter for the mutual information I(?, ?). Intuitively, the minimization of the second term I( X(j)(?j)</p><formula xml:id="formula_14">t?1 ; X (j)</formula><p>t?1 ) requires the noise amplitude ? j to go up. The minimization of the first term requires the noise amplitude ? j to go down, and the larger causal strength from X (j)</p><formula xml:id="formula_15">t?1 to x (i)</formula><p>t , the larger this force. The minimization of the two terms strikes a balance, at which point the I( X(j)(?j)</p><formula xml:id="formula_16">t?1 ; X (j)</formula><p>t?1 ) measures how many bits of information does time series j need to provide to the learner, without making the prediction worsened. Thus, we propose to use</p><formula xml:id="formula_17">W ji = I( X(j)(? * j ) t?1 ; X (j) t?1 )<label>(3)</label></formula><p>as another measure for causality, where</p><formula xml:id="formula_18">(f ? * , ? * ) = argmin (f ? ,?) R X,x (i) [f ? , ?] 1 .</formula><p>In Appendix B, we analyze the qualitative and quantitative properties of the learnable noise risk, and give intuitions why it is likely to select the variables that directly structurally causes x (i)</p><p>t . Empirically, we minimize the following empirical risk:</p><formula xml:id="formula_19">RX,x (i) , [f ? , ?] = 1 |T| t?T x (i) t ? f ? ( X(?) t?1 ) 2 + ? N j=1 I( X(j)(?j) t?1 ; X (j) t?1 )<label>(4)</label></formula><p>In general, it may be difficult to estimate the mutual information I( X(j)(?j)</p><formula xml:id="formula_20">t?1 ; X (j) t?1 ) with large dimension of X (j)</formula><p>t?1 such that the expression is also differentiable w.r.t. ? j . Utilizing the property of Gaussian channels, in Appendix C we prove that I( X(j)(?j)</p><formula xml:id="formula_21">t?1 ; X (j) t?1 ) ? 1 2 KM l=1 log 1 + Var(X (j) t?1,l ) ? 2 j,l</formula><p>, where l denotes the l th element of a vector, and Var(X</p><formula xml:id="formula_22">(j) t?1,l ) is the variance of X (j)</formula><p>t?1,l across t. Therefore, in practice to improve efficiency, we can optimize an upper bound of the learnable noise risk:</p><formula xml:id="formula_23">Rupper X,x (i) , [f ? , ?] = 1 |T| t?T x (i) t ? f ? ( X(?) t?1 ) 2 + ? 2 N j=1 KM l=1 log 1 + Var(X (j) t?1,l ) ? 2 j,l<label>(5)</label></formula><p>When the dimension of X (j) t?1 is large, differentiable estimate of the mutual information, such as MINE <ref type="bibr" target="#b0">(Belghazi et al. (2018)</ref>), can be applied. We provide Algorithm 1 to empirically estimate W ji , which we term Causal Inference with Learnable Noise (CILN).</p></div>
+<div xmlns="http://www.tei-c.org/ns/1.0"><head n="4">EXPERIMENTS</head><p>To demonstrate that our proposed method works, we test it on both synthetic and real datasets. We first use synthetic datasets, where we know the underlying causal structure and compare with previous causal measures. We then test whether our algorithm can infer causal structure from watching an agent playing video games. Finally, we apply our algorithm to real-world heart-rate vs. breath-rate and rat EEG datasets to test its effectiveness. We use the Rupper X,x (i) , [f ? , ?] (Eq. 5) for optimization for all experiments. The metrics we use are the standard metrics of area under the precision-recall curve (AUC-PR) <ref type="bibr" target="#b7">(Davis &amp; Goadrich (2006)</ref>), and area under the ROC curve (AUC-ROC).</p></div>
+<div xmlns="http://www.tei-c.org/ns/1.0"><head n="4.1">SYNTHETIC EXPERIMENT WITH LOG-NORMAL CAUSAL STRENGTHS</head><p>In this experiment, we evaluate our method together with other methods with a nonlinear synthetic dataset generated to have a known causal structure (hidden to the methods being compared). We study how they perform with varying number N of time series, with N up to 30. To generate the data, we let each x (i)</p><p>t have dimension M = 1, and also set the maximum time horizon K = 3, so each X (j) t?1 is a K ? M = 3 ? 1 matrix. We use the following realization of the response function h i in Eq. (1):</p><formula xml:id="formula_24">x (i) t = h i (X t?1 , u t ) = H 1 ? ? N j=1 A ji H 2 (B j X (j) t?1 ) ? ? + u t , i = 1, 2, ...N<label>(6)</label></formula><p>where u t ? N (0, I) ? R M , denoting element-wise multiplication, and H 1 and H 2 are two nonlinear functions to make the response functions nonlinear. In this experiment, we use H 1 (x) = softplus(x) = log(1 + e x ), and H 2 (x) = tanh(x), we also find similar performance with other choices of nonlinear functions. B j is a K ? M random matrix, whose element is sampled from U [?1, 1]. A ji is a K ? M matrix, with 0.5 probability of being a zero matrix and 0.5 probability of being a nonzero random matrix, characterizing the underlying causal strength from j to i. Crucially, to reflect that the causal strength may span different orders of magnitude, if A ji is sampled to be a nonzero matrix, then the amplitude of each of its element is sampled from a log-normal distribution with ? = 1, ? = 0, their sign sampling from U {?1, 1}. Denote A indi as the 0-1 indicator matrix of causality (A indi,ji = 1 if |A ji | &gt; 0; 0 otherwise). The goal of each algorithm being evaluated is to produce an N ? N causal matrix ?, where each entry ?ji characterizes the causal strength from j to i. Then the flattened ? is evaluated against the flattened A indi (excluding diagonal elements of the matrices), producing the metrics of AUC-PR and AUC-ROC.</p><p>In general, for a large N , the number of possible causal graphs grows double exponentially: there are 2 N 2 possible matrix of A indi . To give an estimate, for N = 3, 4, 5, 8, 10, 20, 30, there are 512, 6.6 ? 10 4 , 3.3 ? 10 7 , 1.8 ? 10 19 , 1.2 ? 10 30 , 2.6 ? 10 120 , 8.5 ? 10 270 number of possible graphs, respectively. Therefore, estimating the causal graph is in general a non-trivial task when N is large. We compare our algorithm, with previous methods including transfer entropy <ref type="bibr" target="#b48">(Schreiber (2000)</ref>), causal influence <ref type="bibr" target="#b21">(Janzing et al. (2013)</ref>), linear Granger causality <ref type="bibr" target="#b13">(Granger (1969)</ref>; <ref type="bibr" target="#b9">Ding et al. (2006)</ref>), and a baseline of mutual information ?ji = I(X</p><formula xml:id="formula_25">(j) t?1 ; x (i) t ) (which gives ?ji = ?ij ).</formula><p>The implementation details for each method and each experiment are provided in Appendix D and Appendix E, respectively. Table <ref type="table" target="#tab_1">1</ref> and 2 shows the average AUC-PR and AUC-ROC with each N , each with four random initializations of the true underlying causal matrix A and dataset.</p><p>We see that not only does our method outperform other methods by a large margin across all N s, it also shows good performance when N is as large as 30, demonstrating our method's capability and scalability to infer complex causal structures from interacting time series. For the Causal Influence method, although it has very good mathematical properties, it may be impractical in practice, as is also shown in the table. This is due to that it is defined as the KL-divergence between (X t?1 , x </p><formula xml:id="formula_26">(i) t?</formula><p>t?1 ), each of which is an (N K + 1)M ?dimensional vector, which can quickly go to high dimensions, where density estimation required to calculate KL-divergence is in general data-hungry and difficult. In comparison, our method that estimates causal strength via minimizing prediction errors is comparatively easier in high dimensions (only have to predict a M dimensional vector conditioned on the inputs), which contributes to a better performance when N is large.</p><p>Since in practice, we do not know the underlying causal structure a priori, it presents a greater challenge to select the model capacity for f ? , as compared with supervised learning method where we can do cross-validation. To see how the capacity of the function approximator f ? influences our method, we vary the number of layers and the number of neurons in each layer at N = 10. Table <ref type="table">3</ref> summarizes the result. We see that our method's performance here is hardly influenced by the model capacity, with only a slight degradation at very low capacity. This shows that our method is quite tolerant and stable with model capacity variations. </p></div>
+<div xmlns="http://www.tei-c.org/ns/1.0"><head>AUC-PR AUC-ROC</head></div>
+<div xmlns="http://www.tei-c.org/ns/1.0"><head n="4.2">EXPERIMENTS WITH VIDEO GAMES</head><p>To see how our method can infer causal relations in real videos games, and potentially helping reinforcement learning (RL) or imitation learning (IL), we apply our method to the causal inference between the trajectories of different objects from a trained CNN RL-agent playing Atari Breakout W ji matrix, with the (j, i) th element denoting the inferred causal strength from j to i. We see that there is a prominent causal direction from the ball's y position to the reward, which correctly summarizes that the ball's y position has a large influence on the reward. Additionally, the other discovered causal directions with causal strength greater than 1 include: brick ? reward, ball-y ? brick, reward ? paddle, ball-x ? action, ball-y ? action. The former two correctly summarize causal chains from ball-y ? brick ? reward, the latter two show that the ball's x and y positions also have big causal influences on the trained agent's action: in order that the ball does not fall to the bottom, the agent has to position itself at the right position depending on the x and y positions of the ball.</p><p>In comparison, mutual information (Fig. <ref type="figure">2 (a)</ref>) gives a symmetric matrix that does not differentiate the two possible causal directions. Moreover, it discovers a high mutual information between brick and paddle, which does not related to the underlying causal mechanism, and also missed the causal arrows ball-y?brick?reward. For transfer entropy, although it discovers a number of prominent causal arrows (e.g. ball-x?action, ball-y?action, ball-y?reward, brick?reward), it also gives relative high scores for some incorrect causal arrows: brick? action, ball-y?ball-x, and missed an important causal arrow ball-y?brick. For linear Granger, it gives most arrows 0 or negative score, failing to discover any useful causal arrows. For causal influence, it also fails to discover useful causal arrows.</p><p>The inferred causal matrix and learned models may be useful for downstream learning in RL/IL. The learned models f ? can serve as a succinct subset of the environment model p(s , r|s, a) that predicts future state s and reward r based on current state s and action a. Moreover, the agent can utilize the causal matrix to learn policy much more quickly, by reasoning with a causal chain from the reward backward, and from the action forward and backward, and focusing learning policies that can maximally influence the entities in the causal chains. Take the current Breakout game for example. After discovering the causal matrix (Fig. <ref type="figure">1</ref>) by watching a teacher agent playing, the agent can reason from the reward backward on the causal chain ball-y?brick?reward, and understand that in order to maximize its reward, it has to influence the ball's y position and the number of bricks. Reasoning from the action backward on causal chains ball-x?action and ball-y?action, it understands that the teacher agent can obtain high rewards by making actions based on the ball's x and y position (there are no causal chains from the action forward in Fig. <ref type="figure">1</ref> so the agent as to learn on its own). The agent can then utilize the above reasoning to develop policies ?(a|s) where the state s can focus on the ball's x and y position instead of the entire environment state, and the action a can focus on those that can maximally influence not only the reward, but also the ball-y and brick that is on the reward's backward causal chain. This significantly reduces the search space for the policies, and the agent may probably require significantly less number of episodes to learn a good policy. It will be an exciting future research direction to incorporate this causal reasoning into RL and IL to improve sample efficiency.</p></div>
+<div xmlns="http://www.tei-c.org/ns/1.0"><head n="4.3">HEART-RATE VS. BREATH-RATE AND RAT BRAIN EEG DATASETS</head><p>Now we test our algorithm with real-world datasets. As a common dataset studied in previous causal works, we use the time-series of the breathing rate and instantaneous heart rate of a sleeping patient suffering from sleep apnea (samples 2350-3550 of data set B from Santa Fe Institute time series contest held in 1991, available in PhysioNet). We apply our method to infer the causal strength between the breathing rate and heart rate, with different maximum time horizon K. The result is shown in Fig. <ref type="figure" target="#fig_1">3</ref>. The causal strength from heart to breath is significantly higher than the reverse direction, consistent with the results from previous causal inference methods <ref type="bibr" target="#b48">(Schreiber (2000)</ref>; Ancona et al. ( <ref type="formula">2004</ref>); <ref type="bibr" target="#b32">Marinazzo et al. (2008a)</ref>) as also shown in Fig. <ref type="figure" target="#fig_1">3</ref>. Notably, the causal strength remains at roughly the same level for different Ks, in contrast to the decaying causality index w.r.t. increasing history length in (Ancona et al. ( <ref type="formula">2004</ref>), Fig. <ref type="figure" target="#fig_1">3 (c)</ref>) showing a merit of our method in estimating causal strength across different time-horizons, aided by the flexibility of f ? in extracting the right information to predict the future. The implementation details in this section is provided in Appendix G.</p><p>As a second real-world example, we apply our algorithm in estimating the causal strength of the EEG signals between the right and left cortical intracranial electrodes (Quiroga), also studied in <ref type="bibr">Ancona et al. (2004);</ref><ref type="bibr" target="#b44">Quiroga et al. (2002)</ref>; <ref type="bibr" target="#b32">Marinazzo et al. (2008a)</ref>. Figure <ref type="figure" target="#fig_2">4</ref> (left) shows the inferred causal strength W ji for the EEG signals of a normal rat. We see that there is only a slight asymmetry, with the right channel having a slightly stronger influence on the left channel than the reverse direction. Figure <ref type="figure" target="#fig_2">4</ref> (right) shows W ji for the EEG signals with unilateral lesion in the rostral pole of the reticular thalamic nucleus. We see that there is stronger causal influence from the left to the right channels. Compared with the result of previous works Ancona et al. ( <ref type="formula">2004</ref>); <ref type="bibr" target="#b32">Marinazzo et al. (2008a)</ref> as also shown in Fig. <ref type="figure" target="#fig_5">7</ref>, we see that all methods correctly infer the causal relations before and after brain lesion. In addition, our method shows non-decaying causal strength with increasing history length, in contrast to the decaying causality index in Ancona et al. ( <ref type="formula">2004</ref>), again demonstrating our method's insensitivity against history length, due to its flexibility in extracting the right amount of information in order to predict the future. The above two applications demonstrate our method's capability in inferring the causal relations from noisy, real-world data. </p></div>
+<div xmlns="http://www.tei-c.org/ns/1.0"><head n="5">DISCUSSION AND CONCLUSION</head><p>In this paper, we have addressed causal inference by proposing a novel causal measure, defined via a novel learnable noise risk, that allows function approximators like neural nets to learn complex causal relations via the Causal Inference with Learnable Noise (CILN) algorithm. We provide intuitions that the algorithm is likely to discover variables that directly structurally cause the variable of interest. We demonstrated in synthetic nonlinear datasets that our method outperforms previous methods by a large margin in inferring causal relations with complex structures, can scale to a large number of time series, and is hardly influenced by the capacity of the function approximator. Our method also correctly infers the causal arrows by watching a trained CNN playing Breakout, and give causal directions consistent with prior works in real-world heart-rate vs. breath-rate and rat EEG datasets.</p><p>Our CILN algorithm provides many opportunities for downstream tasks. As discussed in Section 4.2, we can incorporate CILN into reinforcement learning or imitation learning, and by reasoning backward and forward with the discovered causal chains, the agent may be able to learn useful policies with much less number of episodes. It may also help interpret the learned neural nets, by quantifying the causal strength from the input to different hidden neurons to the output neurons. Since W ji is based on mutual information which is scale-free, it may provide additional useful information on the internal mechanisms of neural net, in addition to the weights and gradients. CILN can also help decipher complex real-world systems, for example in neuroscience, economics and finance. As for the error effect of the algorithm, it depends on how the inferred causal matrix is utilized qualitatively or quantitatively downstream. For application in RL/IL, a falsely discovered causal arrow will increase the policy search space and thus reduce sample efficiency, but may not influence final performance since the RL/IL algorithm will eventually learn a (sub)optimal policy within the larger search space. Missed causal arrows (false negatives) may lead to the agent's negligence of certain good policies, therefore it is important for the RL/IL algorithm to always allow a certain amount of exploration in addition to focusing policies on the causal chain. For helping interpretability of neural nets and deciphering complex real-world systems, the false positives/negatives of causal relations will influence the qualitative understanding and potential decision making downstream, and it is important to set a higher/lower threshold for the causal score depending on whether false positives or negatives are deemed less desirable.</p><p>Above all, we believe our work can not only pave the way for future exciting advancements in enabling machine learning models to understand causality, a key component of human intelligence, but also endow researchers with a useful tool for deciphering the causal relations in complex systems.</p></div>
+<div xmlns="http://www.tei-c.org/ns/1.0"><head>REFERENCES</head><p>Nicola Ancona, Daniele Marinazzo, and Sebastiano Stramaglia. Radial basis function approach to nonlinear granger causality of time series. Physical Review E, 70(5):056221, 2004.</p><p>To get a better intuition of the landscape of R X,x (i) [f ? , ?], let's investigate a simple example. Let the response function be:</p><formula xml:id="formula_28">? ? ? ? ? x (1) t := h 1 (u 1 ) = ? ? x ? u 1 x (2) t := h 2 (x (1) t?1 , u 2 ) = x (1) t?1 + ? ? x ? u 2 x (3) t := h 3 (x (2) t?1 , u 3 ) = x (2) t?1 + ? y ? u 3 (10)</formula><p>where u 1 , u 2 , u 3 are independent unit Gaussian variables, and</p><formula xml:id="formula_29">X t?1 = (X (1) t?1 , X (2) t?1 , X (3) t?1 ) = (x (1) t?2 , x (1) t?1 ), (x (2) t?2 , x (2) t?1 ), (x (3) t?2 , x (3) t?1 ) . For R X,x (3) [f ? , ?] = MMSE (3) (?) + ? ? 3 j=1 arctanh(? j ), since only x (1)</formula><p>t?2 and x</p><p>(2)</p><formula xml:id="formula_30">t?1 are d-connected to x (3) t , at the minimization of R X,x (3) [f ? , ?], only x (1) t?2 and x (2)</formula><p>t?1 may have a finite ? * j,l (the other ? * j,l are all infinite). Therefore, setting the ? j,l not corresponding to x</p><p>(1) t?2 and x</p><p>(2) t?1 as infinity, and let</p><p>x(1) t?2 = x</p><p>(1)</p><formula xml:id="formula_31">t?2 + ? x ? x , x(2) t?1 = x<label>(2)</label></formula><p>t?1 + ? y ? y , x and x being independent unit Gaussian variables. Let f ? (x</p><formula xml:id="formula_32">(1) t?2 , x<label>(2)</label></formula><formula xml:id="formula_33">t?1 ) = a ? x (1) t?2 + b ? x (2)</formula><p>t?1 , then we can get an analytic expression for R X,x (3) [f ? , ? x , ? y ]:</p><formula xml:id="formula_34">R X,x (3) [f ? , ? x , ? y ] = a 2 ? x + (b ? 1) 2 (? x + ? x ) + a 2 ? 2 x + b 2 ? 2 y + 2a(b ? 1)? x + ? y + ? 2 log 1 + ? x ? 2 x + ? 2 log 1 + ? x + ? x ? 2 y Minimizing R X,x (3) [f ? , ? x , ? y ] w.r.t.</formula><p>a and b, we get</p><formula xml:id="formula_35">a * = ? 2 y ? x ? 2 x ? 2 y + ? 2 x ? x + ? 2 y ? x + ? 2 x ? x + ? x ? x b * = ? 2 x (? x + ? x ) + ? x ? x ? 2 x ? 2 y + ? 2 x ? x + ? 2 y ? x + ? 2 x ? x + ? x ? x Substituting into R X,x (3) [f ? , ? x , ? y ], we have R X,x (3) [? x , ? y ] = min f ? R X,x (3) [f ? , ? x , ? y ] = ? 2 y (? x ? x + ? 2 x (? x + ? x )) ? 2 x ? 2 y + ? 2 x ? x + ? 2 y ? x + ? 2 x ? x + ? x ? x + ? 2 log 1 + ? x ? 2 x + ? 2 log 1 + ? x + ? x ? 2 y Here we have neglected the constant ? y . To obtain R X,x (3) [?], let ? 1 = tanh 1 2 log 1 + ?x ? 2 x , ? 2 = tanh 1 2 log 1 + ?x+?x ? 2 x , we have ? 2 x = 1??1 2?1 ? x , ? 2 y = 1??2 2?2 (? x + ? x ). Substituting, we have R X,x (3) [?] = MMSE (3) (?) + ? ? 2 j=1 arctanh(? j ) = (? 2 ? 1)(? x + ? x )((? 1 ? 1)? x ? (? 1 + 1)? x ) (1 + ? 1 + ? 2 ? 3? 1 ? 2 )? x + (1 + ? 1 )(1 + ? 2 )? x + ? ? arctanh(? 1 ) + ? ? arctanh(? 2 )</formula><p>Fig. <ref type="figure" target="#fig_3">5</ref> shows the landscape of MMSE (3) (?) and R X,x (3) [?], for ? x = 1, ? x = 2, ? = 1. We see that MMSE (3) (?) satisfies the above mentioned four properties. Particularly, MMSE (3) (?) ?1=1,?2=0 &gt; MMSE (3) (?) ?1=0,?2=1 . After adding ? ? arctanh(? 1 ) + ? ? arctanh(? 2 ), the R X,x (3) [?] has global minimum along ? 1 = 0 largely due to this property. Therefore, for this particular example, when By varying the value of ?, we can tune the relative influence of the two terms MMSE (3) (?) and 2 j=1 arctanh(? j ). The landscape corresponding to ? = 0.01, 0.5, 2, 10 are plotted in Fig. <ref type="figure" target="#fig_4">6</ref>. We see that when ? 1, the MMSE term dominates, and it is possible that the global minimum of R X,x (3) [?] is not at ? 1 = 0. This is similar to the effect of a L1 regularization, where if the coefficient ? for the L1 is vanishingly small, the L1 regularization will barely influence the loss landscape. When ? is not vanishingly small, as in Fig. <ref type="figure" target="#fig_4">6</ref> (b), we see that the global minimum of R X,x (3) [?] lies on ? 1 = 0. When ? ? +?, the 2 j=1 arctanh(? j ) term dominates and the global minimum is at ? 1 = 0, ? 2 = 0.</p><formula xml:id="formula_36">R X,x (3) [?] is minimized, ? 1 = 0, i.e. I(x (1) t?2 , x(1)(? * 1 ) t?2 ) = 0.</formula><p>In general, we expect R X,x (i) [?] behave qualitatively similar. When ? ? +?, the global minimum for R X,x (i) [?] is at ? * = 0. As we ramp down ?, the dimension that has largest influence on MMSE will first host the global minimum with nonzero ? * j , which is most likely the variable that directly structurally causes x (i) i . When ? is further ramping down, we expect that the variables that host the global minimum with nonzero ? j will more likely be those that directly structurally causes x (i) i , due to the landscape influenced by the four properties of MMSE. This can justify the learnable noise risk as a good objective for causal discovery/variable selection. The experiments in the paper will empirically test the performance of the learnable noise risk.</p></div>
+<div xmlns="http://www.tei-c.org/ns/1.0"><head>C UPPER BOUND FOR THE LEARNABLE NOISE RISK</head><p>In this section, we prove that I( X(j)(?j)</p><formula xml:id="formula_37">t?1 ; X (j) t?1 ) ? 1 2 KM l=1 log 1 + Var(X (j) t?1,l ) ? 2 j,l</formula><p>. We formally state the theorem as follows:</p><formula xml:id="formula_38">Theorem 2. Let X(j)(?j) t?1 := X (j)</formula><p>t?1 + ? j ? j , j = 1, 2, ...N be the noise-corrupted inputs with learnable noise amplitudes ? j ? R KM , and j ? N (0, I). We have</p><formula xml:id="formula_39">I( X(j)(?j) t?1 ; X (j) t?1 ) ? 1 2 KM l=1 log 1 + Var(X (j) t?1,l ) ? 2 j,l<label>(11)</label></formula><p>where l is the l th element of a vector, std(X (j) t?1,l ) is the standard deviation of X (j) t?1,l across t. The equality is reached when X (j) t?1 obeys a multivariate Gaussian distribution with diagonal covariance matrix ? satisfying ? l,l = Var(X (j) t?1,l ) + ? 2 j,l . </p></div>
+<div xmlns="http://www.tei-c.org/ns/1.0"><head>D.2 TRANSFER ENTROPY</head><p>We use the definition of transfer entropy as defined in <ref type="bibr" target="#b48">Schreiber (2000)</ref>. In that work the transfer entropy is defined for two time series. To deal with multiple time series, we let X ( ?)</p><p>t?1 also include other time series, similar to the extension of transfer entropy as in <ref type="bibr" target="#b28">Lizier et al. (2008)</ref>.</p></div>
+<div xmlns="http://www.tei-c.org/ns/1.0"><head>D.3 CAUSAL INFLUENCE</head><p>For causal influence, we use the same network architecture as in our method, to learn a prediction model. Then the KL divergence is estimated via the technique in <ref type="bibr" target="#b27">Kraskov et al. (2004)</ref>.</p></div>
+<div xmlns="http://www.tei-c.org/ns/1.0"><head>D.4 LINEAR GRANGER</head><p>We use the definition of linear Granger causality (Eq. ( <ref type="formula">7</ref>) and ( <ref type="formula">8</ref>) in <ref type="bibr" target="#b9">Ding et al. (2006)</ref>) to calculate linear Granger causality. Specifically, we estimate the variance of the residue of a linear predictor of x (i) t?1 with and without X (j) t?1 (also conditioned on X ( ?) t?1 ), using Levinson-Whittle(-Wiggins) and Robinson algorithm <ref type="bibr" target="#b36">(Morf et al. (1978)</ref>). Then the linear Granger causality equals the log of the ratio of the two variances.</p></div>
+<div xmlns="http://www.tei-c.org/ns/1.0"><head>E IMPLEMENTATION DETAILS FOR SYNTHETIC EXPERIMENTS</head><p>For all experiments in this section, each metrics is obtained by performing the experiments (including generation of the dataset and the training) four times with seed = 0, 30, 60, 90 and averaging the resulting metrics. For the ground-truth causal tensor A, each element A ji is a K ? M matrix, with 0.5 probability of being an all-zero matrix, and 0.5 probability of being a nonzero matrix. If A ji is a nonzero matrix, its each element is sampled from a log-normal distribution with ? = 0 and ? = 1. For B, each B j is also a K ? N matrix, with each element sampling from U [?1, 1]. We use H 1 (x) = softplus(x) = log(1 + e x ), and H 2 (x) = tanh(x) in equation ( <ref type="formula" target="#formula_24">6</ref>). As a default, 500 time series each with length of 22 are generated from Eq. ( <ref type="formula" target="#formula_24">6</ref>), each of which is wrapped into 19 (X t?1 , x (i) t ) pairs (since K = 3), so there are in total 500 ? 19 = 9500 examples for each dataset. The train-test-split is 4:1 for all experiments in this paper.</p></div>
+<div xmlns="http://www.tei-c.org/ns/1.0"><head>F DETAILS FOR THE VIDEO GAME DATASET</head><p>Here, we implement a custom Atari Breakout game in the OpenAI Gym <ref type="bibr" target="#b3">(Brockman et al. (2016)</ref>) environment, mimicking the original game, where we can access the state of the ball, paddle and bricks, etc. This representation is also used in the OO-MDP <ref type="bibr" target="#b10">(Diuk et al. (2008)</ref>) paradigm for a more efficient representation of the environment state. We use the DQN algorithm, the same CNN architecture as in <ref type="bibr" target="#b35">Mnih et al. (2015)</ref> to train an RL agent. Then we let it play the game for 20000 steps, obtaining a dataset with time-length of 20000 steps (if the agent dies, we restart the game) and 6 time series: action, paddle's x position, ball's x position, ball's y position, number of bricks and reward. We then feed the time series (each time series normalized to mean of 0 and variance of 1) to our method, the same procedure as performed in the synthetic experiment, to let it produce an inferred causal matrix W ji , which is shown in Fig. <ref type="figure">1</ref>. All the datasets used in this paper and code will be open-sourced upon publication of the paper.</p></div>
+<div xmlns="http://www.tei-c.org/ns/1.0"><head>G IMPLEMENTATION DETAILS FOR THE REAL-WORLD DATASET</head><p>For the two real-world datasets, we obtain the data with the same procedure as in <ref type="bibr">Ancona et al. (2004)</ref>. Then the data (each time series normalized to mean of 0 and variance of 1) are fed into our algorithm to infer the causal strength W ji with the default settings as described in Appendix D and E. For each K = 1, 2, ...20, the experiments are run for 50 times with seed from 0 to 49, and Fig. <ref type="figure" target="#fig_1">3</ref> and Fig. <ref type="figure" target="#fig_2">4</ref> are obtained by averaging over the inferred W matrix.  <ref type="bibr" target="#b33">Marinazzo et al. (2008b)</ref>. The filtered causality index vs. varying p, the order of the inhomogeneous polynomial kernel, before (upper) and after (lower) brain lesion.</p></div>
+<div xmlns="http://www.tei-c.org/ns/1.0"><head>H CAUSALITY RESULTS FOR THE RAT-EEG DATASET BY PREVIOUS WORKS</head></div><figure xmlns="http://www.tei-c.org/ns/1.0" xml:id="fig_0"><head>Figure 1 :Figure 2 :</head><label>12</label><figDesc>Figure1: Causal strength W ji inferred by our method with watching a trained CNN playing Breakout. The (j, i) element denotes the inferred causal strength from j to i.</figDesc><graphic url="image-1.png" coords="8,256.92,89.99,97.92,97.92" type="bitmap" /></figure>
+<figure xmlns="http://www.tei-c.org/ns/1.0" xml:id="fig_1"><head>Figure 3 :</head><label>3</label><figDesc>Figure 3: (a) Causal strength W ji inferred by our method with the heart-rate vs. breath-rate dataset, averaged over 50 initializations of f ? . The shaded areas in this figure and Fig. 4 are the 95% confidence interval. (b) Upper: the filtered causality index vs. varying width of Gaussian kernel ? (Marinazzo et al. (2008a)); lower: transfer entropy vs. r, the length scale (Schreiber (2000)); (c) The causality index for breath?heart (lower) and heart?breath (upper) in Ancona et al. (2004).</figDesc><graphic url="image-11.png" coords="9,241.17,91.82,130.68,102.43" type="bitmap" /></figure>
+<figure xmlns="http://www.tei-c.org/ns/1.0" xml:id="fig_2"><head>Figure 4 :</head><label>4</label><figDesc>Figure 4: Causal strength inferred by our method with the EEG datasets, for different maximum time horizon K, averaged over 50 initializations of f ? . (Left) Causal strength W ji for the EEG signal for a normal rat. (Right) Causal strength W ji of EEG signal from the same rat, after brain lesion.</figDesc></figure>
+<figure xmlns="http://www.tei-c.org/ns/1.0" xml:id="fig_3"><head>Figure 5 :</head><label>5</label><figDesc>Figure 5: (a) MMSE (3) (?) and (b) R X,x (3) [?] in section B.3, for ? x = 1, ? x = 2, ? = 1.</figDesc><graphic url="image-13.png" coords="19,115.35,92.27,178.20,143.45" type="bitmap" /></figure>
+<figure xmlns="http://www.tei-c.org/ns/1.0" xml:id="fig_4"><head>Figure 6 :</head><label>6</label><figDesc>Figure 6: (a) R X,x (3) [?] for (a) ? = 0.01, (b) ? = 0.5, (c) ? = 2 and (d) ? = 10 in section B.3, for ? x = 1, ? x = 2.</figDesc><graphic url="image-17.png" coords="20,121.58,400.38,178.20,143.90" type="bitmap" /></figure>
+<figure xmlns="http://www.tei-c.org/ns/1.0" xml:id="fig_5"><head>Figure 7 :</head><label>7</label><figDesc>Figure 7: Causal indices for the rat EEG dataset with previous methods. (a) By Ancona et al. (2004). Left: the variance for the left EEG (open circles) and right EEG (diamonds) vs. time lag m before brain lesion. Right: the causality index after brain lesion. (b) By<ref type="bibr" target="#b33">Marinazzo et al. (2008b)</ref>. The filtered causality index vs. varying p, the order of the inhomogeneous polynomial kernel, before (upper) and after (lower) brain lesion.</figDesc><graphic url="image-21.png" coords="23,205.76,363.87,198.01,152.03" type="bitmap" /></figure>
+<figure xmlns="http://www.tei-c.org/ns/1.0" type="table" xml:id="tab_1"><head>Table 1 :</head><label>1</label><figDesc>Average AUC-PR vs. N , with random sampling of A indi . Bold font marks the top method for each N .</figDesc><table><row><cell>1 )</cell></row></table></figure>
+<figure xmlns="http://www.tei-c.org/ns/1.0" type="table" xml:id="tab_2"><head>Table 2 :</head><label>2</label><figDesc>Average AUC-ROC vs. N , with random sampling of A indi . Bold font marks the top method for each N .</figDesc><table><row><cell>and (X</cell><cell>( j) t?1 , x</cell></row></table></figure>
+			<note xmlns="http://www.tei-c.org/ns/1.0" place="foot" n="1">Note also that throughout this paper, when talking about causal matrices, the (j, i) th element always denotes the causal strength from j to i.</note>
+			<note xmlns="http://www.tei-c.org/ns/1.0" place="foot" n="2">A video showing the game playing can be seen at https://goo.gl/XGzppc</note>
+		</body>
+		<back>
+			<div type="annex">
+<div xmlns="http://www.tei-c.org/ns/1.0"><head>Appendix</head><p>A THEOREM 1 AND PROOF Here, we formally propose a theorem corresponding to the statement in section 3.2, and provide proof afterwords.</p><p>Theorem 1. For system Eq. 1, for any i, j ? {1, 2, ...N }, i = j, if X (j) t?1 Granger-causes x (i) t , then X (j) t?1 directly structurally causes x (i) t .</p><p>Proof. We base the proof on the Theorem 5.6 in <ref type="bibr" target="#b56">White et al. (2011)</ref>. Firstly, by definition, the system Eq. ( <ref type="formula">1</ref>) belongs to the canonical settable system (Def. 3.3 in <ref type="bibr" target="#b56">White et al. (2011)</ref>), on which their Theorem 5.6 is based. To prove that in our system Granger causality can deduce direct structural causality, we only have to prove that the assumption A.1 and assumption A.2 in <ref type="bibr" target="#b56">White et al. (2011)</ref> are satisfied by our system. If we identify our x (i) t with their Y 1,t , our X t?1 with their Y t?1 , our x (j) t with their Y 2,t , our u i,t (our u i at time t) with their U 1,t , our u j,t with their U 2,t , their Z t = ?, W t = ?, then our system Eq. (1) satisfies their Assumption A.1. Additionally, by definition, our u i ? R M , i = 1, 2, ...N are random variables that are mutually independent, and also independent of any X (i)</p><p>t , i ? {1, 2, ...N }. Therefore, our system satisfies their strict exogeneity</p><p>), which is a sufficient condition for Assumption A.2. Therefore, both their Assumption A.1 and Assumption A.2 are satisfied by our system Eq. ( <ref type="formula">1</ref>). Applying their Theorem 5.6, we prove Theorem 1.</p></div>
+<div xmlns="http://www.tei-c.org/ns/1.0"><head>B ANALYZING THE PROPERTY OF THE LEARNABLE NOISE RISK</head><p>Firstly we state the assumption that will be used throughout this section: Assumption 1. Assume that f ? ? F is a continuous function and has enough capacity so that it can approximate any dx</p><p>t . Let j = i and assume that P (X (j) t?1 ) has support with intrinsic dimension of KM .</p><p>Also we emphasize that in this paper, the expected risks (with symbol R) are w.r.t. the distributions, and the empirical risks (with symbol R) are w.r.t. a dataset drawn from the distribution, with finite number of examples. The theorems in this paper are all proved w.r.t. distributions (assuming infinite number of examples). Sample complexity results will be left for future work.</p><p>The structure of this section is as follows. First in subsection B.1 and B.2, we prove three lemmas that will be helpful for the following analysis. Then in subsection B.3, we analyze the property of the learnable noise risk both qualitatively and quantitatively, and argue why the learnable noise risk is likely to select the variables that directly structurally causes x (i) t .</p></div>
+<div xmlns="http://www.tei-c.org/ns/1.0"><head>B.1 PROVING A LEMMA</head><p>Here we prove Lemmas 1.1. Lemma 1.1. Suppose that Assumption 1 holds, we have</p><p>In other words, for the MSE risk, its minimum is attained when f ? (X t?1 ) is the expectation of x</p><p>Proof. The proof of the lemma is adapted from <ref type="bibr" target="#b39">Papoulis (1985)</ref>. The risk</p><p>For any X t?1 , treating f ? (X t?1 ) ? R M as a vector, let's calculate its value such that the integral</p><p>we have dx</p><p>Therefore, for any</p><p>t is the only stationary point for F (f ? (X t?1 )).</p><p>Taking the second derivative, we have</p><p>where I is an M ? M identity matrix, which is always positive definite.</p><p>Therefore, for any</p><p>The minimum of the risk R X,</p><p>is true for any X t?1 . Given Assumption 1, we know that f ? ? F has enough capacity such that it can approximate any dx</p><p>Lemma 1.2. Suppose that Assumption 1 holds, and X</p><p>Proof. Since Assumption 1 holds, according to Lemma 1.1, Lemma 1.2 is equivalent to</p><p>We have</p><p>The third equality (the one before the inequality) is due to that X (W )</p><p>t?1 ). The inequality step first uses the setting in Eq.</p><p>(1) that the noise variables u i are effective arguments of the response functions h i , and that each h i is "causality in mean". Therefore, dx</p><p>, hence the inequality.</p><p>Lemma 1.3. Suppose that Assumption 1 holds, and X (D)</p><p>t?1 ? X t?1 are the set of variables that directly structurally causes</p><p>t?1 are mutually exclusive, and X</p><p>t?1 are the set of variables that directly structurally causes x (i) t , there does not exist a X (S)</p></div>
+<div xmlns="http://www.tei-c.org/ns/1.0"><head>B.3 QUALITATIVE AND QUANTITATIVE BEHAVIORS OF THE LEARNABLE NOISE RISK</head><p>In this section, we analyze the qualitative and quantitative behaviors of the learnable noise risk (Eq. 2), with varying noise levels ? j . For each variable X (j)</p><p>) ? [0, 1] as a "rescaled" mutual information between X (j)</p><p>t?1 and X(j)(?j)</p><p>t?1 , ? j = 1. When all elements of ? j ? ?, ? j = 0. Denoting ? = (? 1 , ? 2 , ...? N ), we can then rewrite the learnable noise risk (Eq. 2) as</p><p>where</p><p>t?1 ? X t?1 be the set of variables that directly structurally causes x (i) t , and denote the corresponding set of ? j as ? (D) . Denote X</p><p>t?1 and the corresponding set of ? j as ? ( D) . For any i = 1, 2, ...N , we have the following properties:</p><p>1. MMSE (i) (?) attains maximum at ? = 0.</p><p>2. MMSE (i) (?) is monotonically decreasing w.r.t. each ? j .</p></div>
+<div xmlns="http://www.tei-c.org/ns/1.0"><head n="3.">MMSE</head><p>Proof. We have I( X(j)(?j)</p><p>Here H(?) is differential entropy. For X(j)(?j)</p><p>t?1</p><p>, its variance at the l th dimension is Var(</p><p>The second equality is due to that X (j) t?1 is independent of j . Using the principle of maximum entropy, the distribution that maximizes H( X(j)(?j)</p><p>t?1</p><p>) subject to the constraint of Var(</p><p>The equality is reached when X (j) t?1 obeys a multivariate Gaussian distribution with diagonal covariance matrix ? satisfying ? l,l = Var(X (j) t?1,l ) + ? 2 j,l .</p></div>
+<div xmlns="http://www.tei-c.org/ns/1.0"><head>D IMPLEMENTATION DETAILS FOR THE METHODS</head><p>Here we state the implementation details for our method, as well as other methods being compared. Throughout this paper, unless otherwise specified, we use the standard technique in <ref type="bibr" target="#b27">Kraskov et al. (2004)</ref> to estimate the KL-divergence and mutual information, which is used in our implementations of Mutual information, Transfer Entropy and Causal Influence.</p></div>
+<div xmlns="http://www.tei-c.org/ns/1.0"><head>D.1 OUR METHOD</head><p>Without stating otherwise, our method (Algorithm 1) as a default uses a three layer neural net, with two hidden layers having 8 neurons and SELU <ref type="bibr" target="#b26">(Klambauer et al. (2017)</ref>) activation, and the last layer having linear activation. Adam (Kingma &amp; Ba (2014)) optimizer with learning rate = 10 ?4 is used as default throughout this paper. We set ? 0 = 0.01 and ? = 0.01. We use 10000 epochs, with earlystopping such that if the best validation loss does not go down for 40 monitoring points (we monitor the validation loss every 20 epochs), do early-stop. It also has a 400 epoch warm-up period where the mutual information term is turned off, to allow f ? to find a good initial model as a start. We use the approximation I( X(j)(? * j ) t?1 ; X (j) t?1 ) 1 2 KM l=1 log(1 + 1/? 2 j,l ) in the risk and also in estimating W ji , as discussed in the main text in 3.3. Here ? j,l = ? j,l std(X</p><p>is the relative noise scale w.r.t. the standard deviation of each element, l denoting the l th element of the KM -dimensional vector. In this work, we fix ? j,l to be the same for each j, and let ? j be a single parameter instead of a vector. This simplifies the risk calculation, and also to a first order invariant to the reparameterizaiton of each time series X (j) t?1 .</p></div>			</div>
+			<div type="references">
+
+				<listBibl>
+
+<biblStruct xml:id="b0">
+	<monogr>
+		<title level="m" type="main">Mine: mutual information neural estimation</title>
+		<author>
+			<persName><forename type="first">Ishmael</forename><surname>Belghazi</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Sai</forename><surname>Rajeswar</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Aristide</forename><surname>Baratin</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Devon</forename><surname>Hjelm</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Aaron</forename><surname>Courville</surname></persName>
+		</author>
+		<idno type="arXiv">arXiv:1801.04062</idno>
+		<imprint>
+			<date type="published" when="2018">2018</date>
+		</imprint>
+	</monogr>
+	<note type="report_type">arXiv preprint</note>
+</biblStruct>
+
+<biblStruct xml:id="b1">
+	<analytic>
+		<title level="a" type="main">The arcade learning environment: An evaluation platform for general agents</title>
+		<author>
+			<persName><forename type="first">Yavar</forename><surname>Marc G Bellemare</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Joel</forename><surname>Naddaf</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Michael</forename><surname>Veness</surname></persName>
+		</author>
+		<author>
+			<persName><surname>Bowling</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="j">Journal of Artificial Intelligence Research</title>
+		<imprint>
+			<biblScope unit="volume">47</biblScope>
+			<biblScope unit="page" from="253" to="279" />
+			<date type="published" when="2013">2013</date>
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b2">
+	<analytic>
+		<title level="a" type="main">The causal relation between human papillomavirus and cervical cancer</title>
+		<author>
+			<persName><forename type="first">X</forename><surname>Francesc</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Attila</forename><surname>Bosch</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Nubia</forename><surname>Lorincz</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Cjlm</forename><surname>Mu?oz</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Keerti V</forename><surname>Meijer</surname></persName>
+		</author>
+		<author>
+			<persName><surname>Shah</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="j">Journal of clinical pathology</title>
+		<imprint>
+			<biblScope unit="volume">55</biblScope>
+			<biblScope unit="issue">4</biblScope>
+			<biblScope unit="page" from="244" to="265" />
+			<date type="published" when="2002">2002</date>
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b3">
+	<monogr>
+		<title level="m" type="main">Openai gym</title>
+		<author>
+			<persName><forename type="first">Greg</forename><surname>Brockman</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Vicki</forename><surname>Cheung</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Ludwig</forename><surname>Pettersson</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Jonas</forename><surname>Schneider</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">John</forename><surname>Schulman</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Jie</forename><surname>Tang</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Wojciech</forename><surname>Zaremba</surname></persName>
+		</author>
+		<imprint>
+			<date type="published" when="2016">2016</date>
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b4">
+	<analytic>
+		<title level="a" type="main">The power of possibility: Causal learning, counterfactual reasoning, and pretend play. Philosophical Transactions of the</title>
+		<author>
+			<persName><forename type="first">Daphna</forename><surname>Buchsbaum</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Sophie</forename><surname>Bridgers</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Deena</forename><forename type="middle">Skolnick</forename><surname>Weisberg</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Alison</forename><surname>Gopnik</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="j">Royal Society of London B: Biological Sciences</title>
+		<imprint>
+			<biblScope unit="volume">367</biblScope>
+			<biblScope unit="page" from="2202" to="2212" />
+			<date type="published" when="1599">1599. 2012</date>
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b5">
+	<analytic>
+		<title level="a" type="main">Optimal structure identification with greedy search</title>
+		<author>
+			<persName><forename type="first">David</forename><surname>Maxwell</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Chickering</forename></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="j">Journal of machine learning research</title>
+		<imprint>
+			<biblScope unit="volume">3</biblScope>
+			<biblScope unit="page" from="507" to="554" />
+			<date type="published" when="2002-11">Nov. 2002</date>
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b6">
+	<monogr>
+		<title level="m" type="main">Inferring deterministic causal relations</title>
+		<author>
+			<persName><forename type="first">Povilas</forename><surname>Daniusis</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Dominik</forename><surname>Janzing</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Joris</forename><surname>Mooij</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Jakob</forename><surname>Zscheischler</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Bastian</forename><surname>Steudel</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Kun</forename><surname>Zhang</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Bernhard</forename><surname>Sch?lkopf</surname></persName>
+		</author>
+		<idno type="arXiv">arXiv:1203.3475</idno>
+		<imprint>
+			<date type="published" when="2012">2012</date>
+		</imprint>
+	</monogr>
+	<note type="report_type">arXiv preprint</note>
+</biblStruct>
+
+<biblStruct xml:id="b7">
+	<analytic>
+		<title level="a" type="main">The relationship between precision-recall and roc curves</title>
+		<author>
+			<persName><forename type="first">Jesse</forename><surname>Davis</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Mark</forename><surname>Goadrich</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="m">Proceedings of the 23rd international conference on Machine learning</title>
+				<meeting>the 23rd international conference on Machine learning</meeting>
+		<imprint>
+			<publisher>ACM</publisher>
+			<date type="published" when="2006">2006</date>
+			<biblScope unit="page" from="233" to="240" />
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b8">
+	<analytic>
+		<title level="a" type="main">Multivariate granger causality analysis of fmri data</title>
+		<author>
+			<persName><forename type="first">Gopikrishna</forename><surname>Deshpande</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Stephan</forename><surname>Laconte</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">George</forename><forename type="middle">Andrew</forename><surname>James</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Scott</forename><surname>Peltier</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Xiaoping</forename><surname>Hu</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="j">Human brain mapping</title>
+		<imprint>
+			<biblScope unit="volume">30</biblScope>
+			<biblScope unit="issue">4</biblScope>
+			<biblScope unit="page" from="1361" to="1373" />
+			<date type="published" when="2009">2009</date>
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b9">
+	<monogr>
+		<title level="m" type="main">Granger causality: basic theory and application to neuroscience. Handbook of time series analysis: recent theoretical developments and applications</title>
+		<author>
+			<persName><forename type="first">Mingzhou</forename><surname>Ding</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Yonghong</forename><surname>Chen</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Steven</forename><forename type="middle">L</forename><surname>Bressler</surname></persName>
+		</author>
+		<imprint>
+			<date type="published" when="2006">2006</date>
+			<biblScope unit="page" from="437" to="460" />
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b10">
+	<analytic>
+		<title level="a" type="main">An object-oriented representation for efficient reinforcement learning</title>
+		<author>
+			<persName><forename type="first">Carlos</forename><surname>Diuk</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Andre</forename><surname>Cohen</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Michael</forename><forename type="middle">L</forename><surname>Littman</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="m">Proceedings of the 25th international conference on Machine learning</title>
+				<meeting>the 25th international conference on Machine learning</meeting>
+		<imprint>
+			<publisher>ACM</publisher>
+			<date type="published" when="2008">2008</date>
+			<biblScope unit="page" from="240" to="247" />
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b11">
+	<analytic>
+		<title level="a" type="main">Dynamic causal modelling</title>
+		<author>
+			<persName><forename type="first">J</forename><surname>Karl</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Lee</forename><surname>Friston</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Will</forename><surname>Harrison</surname></persName>
+		</author>
+		<author>
+			<persName><surname>Penny</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="j">Neuroimage</title>
+		<imprint>
+			<biblScope unit="volume">19</biblScope>
+			<biblScope unit="issue">4</biblScope>
+			<biblScope unit="page" from="1273" to="1302" />
+			<date type="published" when="2003">2003</date>
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b12">
+	<monogr>
+		<title level="m" type="main">Forecasting Economic Time Series</title>
+		<author>
+			<persName><forename type="first">Clive</forename><surname>Granger</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Paul</forename><surname>Newbold</surname></persName>
+		</author>
+		<idno>eee:monogr:9780122951831</idno>
+		<ptr target="https://EconPapers.repec.org/RePEc" />
+		<imprint>
+			<date type="published" when="1986">1986</date>
+			<publisher>Elsevier</publisher>
+		</imprint>
+	</monogr>
+	<note>2 edition</note>
+</biblStruct>
+
+<biblStruct xml:id="b13">
+	<analytic>
+		<title level="a" type="main">Investigating causal relations by econometric models and cross-spectral methods</title>
+		<author>
+			<persName><forename type="first">W</forename><forename type="middle">J</forename><surname>Clive</surname></persName>
+		</author>
+		<author>
+			<persName><surname>Granger</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="j">Econometrica: Journal of the Econometric Society</title>
+		<imprint>
+			<biblScope unit="page" from="424" to="438" />
+			<date type="published" when="1969">1969</date>
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b14">
+	<monogr>
+		<title level="m" type="main">A bivariate causality between stock prices and exchange rates: evidence from recent asianflu?? ?. The Quarterly Review of Economics and Finance</title>
+		<author>
+			<persName><forename type="first">W</forename><forename type="middle">J</forename><surname>Clive</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Bwo-Nung</forename><surname>Granger</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Chin-Wei</forename><surname>Huangb</surname></persName>
+		</author>
+		<author>
+			<persName><surname>Yang</surname></persName>
+		</author>
+		<imprint>
+			<date type="published" when="2000">2000</date>
+			<biblScope unit="volume">40</biblScope>
+			<biblScope unit="page" from="337" to="354" />
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b15">
+	<analytic>
+		<title level="a" type="main">Pc algorithm for nonparanormal graphical models</title>
+		<author>
+			<persName><forename type="first">Naftali</forename><surname>Harris</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Mathias</forename><surname>Drton</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="j">The Journal of Machine Learning Research</title>
+		<imprint>
+			<biblScope unit="volume">14</biblScope>
+			<biblScope unit="issue">1</biblScope>
+			<biblScope unit="page" from="3365" to="3383" />
+			<date type="published" when="2013">2013</date>
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b16">
+	<analytic>
+		<title level="a" type="main">Characterization and greedy learning of interventional markov equivalence classes of directed acyclic graphs</title>
+		<author>
+			<persName><forename type="first">Alain</forename><surname>Hauser</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Peter</forename><surname>B?hlmann</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="j">Journal of Machine Learning Research</title>
+		<imprint>
+			<biblScope unit="volume">13</biblScope>
+			<biblScope unit="page" from="2409" to="2464" />
+			<date type="published" when="2012-08">Aug. 2012</date>
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b17">
+	<analytic>
+		<title level="a" type="main">Testing for linear and nonlinear granger causality in the stock price-volume relation</title>
+		<author>
+			<persName><forename type="first">Craig</forename><surname>Hiemstra</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Jonathan D Jones</forename></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="j">The Journal of Finance</title>
+		<imprint>
+			<biblScope unit="volume">49</biblScope>
+			<biblScope unit="issue">5</biblScope>
+			<biblScope unit="page" from="1639" to="1664" />
+			<date type="published" when="1994">1994</date>
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b18">
+	<analytic>
+		<title level="a" type="main">Approximation capabilities of multilayer feedforward networks</title>
+		<author>
+			<persName><forename type="first">Kurt</forename><surname>Hornik</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="j">Neural networks</title>
+		<imprint>
+			<biblScope unit="volume">4</biblScope>
+			<biblScope unit="issue">2</biblScope>
+			<biblScope unit="page" from="251" to="257" />
+			<date type="published" when="1991">1991</date>
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b19">
+	<analytic>
+		<title level="a" type="main">Nonlinear causal discovery with additive noise models</title>
+		<author>
+			<persName><forename type="first">O</forename><surname>Patrik</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Dominik</forename><surname>Hoyer</surname></persName>
+		</author>
+		<author>
+			<persName><surname>Janzing</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">M</forename><surname>Joris</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Jonas</forename><surname>Mooij</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Bernhard</forename><surname>Peters</surname></persName>
+		</author>
+		<author>
+			<persName><surname>Sch?lkopf</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="m">Advances in neural information processing systems</title>
+				<imprint>
+			<date type="published" when="2009">2009</date>
+			<biblScope unit="page" from="689" to="696" />
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b20">
+	<analytic>
+		<title level="a" type="main">Information-geometric approach to inferring causal directions</title>
+		<author>
+			<persName><forename type="first">Dominik</forename><surname>Janzing</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Joris</forename><surname>Mooij</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Kun</forename><surname>Zhang</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Jan</forename><surname>Lemeire</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Jakob</forename><surname>Zscheischler</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="m">Povilas Daniu?is, Bastian Steudel, and Bernhard Sch?lkopf</title>
+				<imprint>
+			<date type="published" when="2012">2012</date>
+			<biblScope unit="volume">182</biblScope>
+			<biblScope unit="page" from="1" to="31" />
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b21">
+	<analytic>
+		<title level="a" type="main">Quantifying causal influences</title>
+		<author>
+			<persName><forename type="first">Dominik</forename><surname>Janzing</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">David</forename><surname>Balduzzi</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Moritz</forename><surname>Grosse-Wentrup</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Bernhard</forename><surname>Sch?lkopf</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="j">The Annals of Statistics</title>
+		<imprint>
+			<biblScope unit="volume">41</biblScope>
+			<biblScope unit="issue">5</biblScope>
+			<biblScope unit="page" from="2324" to="2358" />
+			<date type="published" when="2013">2013</date>
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b22">
+	<analytic>
+		<title level="a" type="main">Economic growth and defense spending: Granger causality</title>
+		<author>
+			<persName><forename type="first">Wayne</forename><surname>Joerding</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="j">Journal of Development Economics</title>
+		<imprint>
+			<biblScope unit="volume">21</biblScope>
+			<biblScope unit="issue">1</biblScope>
+			<biblScope unit="page" from="35" to="40" />
+			<date type="published" when="1986">1986</date>
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b23">
+	<monogr>
+		<author>
+			<persName><forename type="first">Ken</forename><surname>Kansky</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Tom</forename><surname>Silver</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">A</forename><surname>David</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Mohamed</forename><surname>M?ly</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Miguel</forename><surname>Eldawy</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Xinghua</forename><surname>L?zaro-Gredilla</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Nimrod</forename><surname>Lou</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Szymon</forename><surname>Dorfman</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Scott</forename><surname>Sidor</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Dileep</forename><surname>Phoenix</surname></persName>
+		</author>
+		<author>
+			<persName><surname>George</surname></persName>
+		</author>
+		<idno type="arXiv">arXiv:1706.04317</idno>
+		<title level="m">Schema networks: Zero-shot transfer with a generative causal model of intuitive physics</title>
+				<imprint>
+			<date type="published" when="2017">2017</date>
+		</imprint>
+	</monogr>
+	<note type="report_type">arXiv preprint</note>
+</biblStruct>
+
+<biblStruct xml:id="b24">
+	<monogr>
+		<title level="m" type="main">Adam: A method for stochastic optimization</title>
+		<author>
+			<persName><forename type="first">P</forename><surname>Diederik</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Jimmy</forename><surname>Kingma</surname></persName>
+		</author>
+		<author>
+			<persName><surname>Ba</surname></persName>
+		</author>
+		<idno type="arXiv">arXiv:1412.6980</idno>
+		<imprint>
+			<date type="published" when="2014">2014</date>
+		</imprint>
+	</monogr>
+	<note type="report_type">arXiv preprint</note>
+</biblStruct>
+
+<biblStruct xml:id="b25">
+	<monogr>
+		<author>
+			<persName><forename type="first">Thomas</forename><surname>Kipf</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Ethan</forename><surname>Fetaya</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Kuan-Chieh</forename><surname>Wang</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Max</forename><surname>Welling</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Richard</forename><surname>Zemel</surname></persName>
+		</author>
+		<idno type="arXiv">arXiv:1802.04687</idno>
+		<title level="m">Neural relational inference for interacting systems</title>
+				<imprint>
+			<date type="published" when="2018">2018</date>
+		</imprint>
+	</monogr>
+	<note type="report_type">arXiv preprint</note>
+</biblStruct>
+
+<biblStruct xml:id="b26">
+	<analytic>
+		<title level="a" type="main">Self-normalizing neural networks</title>
+		<author>
+			<persName><forename type="first">G?nter</forename><surname>Klambauer</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Thomas</forename><surname>Unterthiner</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Andreas</forename><surname>Mayr</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Sepp</forename><surname>Hochreiter</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="m">Advances in Neural Information Processing Systems</title>
+				<imprint>
+			<date type="published" when="2017">2017</date>
+			<biblScope unit="page" from="971" to="980" />
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b27">
+	<analytic>
+		<title level="a" type="main">Estimating mutual information</title>
+		<author>
+			<persName><forename type="first">Alexander</forename><surname>Kraskov</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Harald</forename><surname>St?gbauer</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Peter</forename><surname>Grassberger</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="j">Physical review E</title>
+		<imprint>
+			<biblScope unit="volume">69</biblScope>
+			<biblScope unit="issue">6</biblScope>
+			<biblScope unit="page">66138</biblScope>
+			<date type="published" when="2004">2004</date>
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b28">
+	<analytic>
+		<title level="a" type="main">Local information transfer as a spatiotemporal filter for complex systems</title>
+		<author>
+			<persName><forename type="first">T</forename><surname>Joseph</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Mikhail</forename><surname>Lizier</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Albert</forename><forename type="middle">Y</forename><surname>Prokopenko</surname></persName>
+		</author>
+		<author>
+			<persName><surname>Zomaya</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="j">Physical Review E</title>
+		<imprint>
+			<biblScope unit="volume">77</biblScope>
+			<biblScope unit="issue">2</biblScope>
+			<biblScope unit="page">26110</biblScope>
+			<date type="published" when="2008">2008</date>
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b29">
+	<analytic>
+		<title level="a" type="main">Towards a learning theory of cause-effect inference</title>
+		<author>
+			<persName><forename type="first">David</forename><surname>Lopez-Paz</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Krikamol</forename><surname>Muandet</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Bernhard</forename><surname>Sch?lkopf</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Iliya</forename><surname>Tolstikhin</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="m">International Conference on Machine Learning</title>
+				<imprint>
+			<date type="published" when="2015">2015</date>
+			<biblScope unit="page" from="1452" to="1461" />
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b30">
+	<analytic>
+		<title level="a" type="main">Causal effect inference with deep latent-variable models</title>
+		<author>
+			<persName><forename type="first">Christos</forename><surname>Louizos</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Uri</forename><surname>Shalit</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">M</forename><surname>Joris</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">David</forename><surname>Mooij</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Richard</forename><surname>Sontag</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Max</forename><surname>Zemel</surname></persName>
+		</author>
+		<author>
+			<persName><surname>Welling</surname></persName>
+		</author>
+		<ptr target="http://papers.nips.cc/paper/7223-causal-effect-inference-with-deep-latent-variable-models" />
+	</analytic>
+	<monogr>
+		<title level="m">Advances in Neural Information Processing Systems</title>
+				<editor>
+			<persName><forename type="first">I</forename><surname>Guyon</surname></persName>
+		</editor>
+		<editor>
+			<persName><forename type="first">U</forename><forename type="middle">V</forename><surname>Luxburg</surname></persName>
+		</editor>
+		<editor>
+			<persName><forename type="first">S</forename><surname>Bengio</surname></persName>
+		</editor>
+		<editor>
+			<persName><forename type="first">H</forename><surname>Wallach</surname></persName>
+		</editor>
+		<editor>
+			<persName><forename type="first">R</forename><surname>Fergus</surname></persName>
+		</editor>
+		<editor>
+			<persName><forename type="first">S</forename><surname>Vishwanathan</surname></persName>
+		</editor>
+		<editor>
+			<persName><forename type="first">R</forename><surname>Garnett</surname></persName>
+		</editor>
+		<imprint>
+			<publisher>Curran Associates, Inc</publisher>
+			<date type="published" when="2017">2017</date>
+			<biblScope unit="volume">30</biblScope>
+			<biblScope unit="page" from="6446" to="6456" />
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b31">
+	<analytic>
+		<title level="a" type="main">Grouped graphical granger modeling for gene expression regulatory networks discovery</title>
+		<author>
+			<persName><forename type="first">C</forename><surname>Aur?lie</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Naoki</forename><surname>Lozano</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Yan</forename><surname>Abe</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Saharon</forename><surname>Liu</surname></persName>
+		</author>
+		<author>
+			<persName><surname>Rosset</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="j">Bioinformatics</title>
+		<imprint>
+			<biblScope unit="volume">25</biblScope>
+			<biblScope unit="issue">12</biblScope>
+			<biblScope unit="page" from="110" to="118" />
+			<date type="published" when="2009">2009</date>
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b32">
+	<analytic>
+		<title level="a" type="main">Kernel method for nonlinear granger causality</title>
+		<author>
+			<persName><forename type="first">Daniele</forename><surname>Marinazzo</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Mario</forename><surname>Pellicoro</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Sebastiano</forename><surname>Stramaglia</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="j">Physical review letters</title>
+		<imprint>
+			<biblScope unit="volume">100</biblScope>
+			<biblScope unit="issue">14</biblScope>
+			<biblScope unit="page">144103</biblScope>
+			<date type="published" when="2008">2008a</date>
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b33">
+	<analytic>
+		<title level="a" type="main">Kernel-granger causality and the analysis of dynamical networks</title>
+		<author>
+			<persName><forename type="first">Daniele</forename><surname>Marinazzo</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Mario</forename><surname>Pellicoro</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Sebastiano</forename><surname>Stramaglia</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="j">Physical review E</title>
+		<imprint>
+			<biblScope unit="volume">77</biblScope>
+			<biblScope unit="issue">5</biblScope>
+			<biblScope unit="page">56215</biblScope>
+			<date type="published" when="2008">2008b</date>
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b34">
+	<analytic>
+		<title level="a" type="main">The group lasso for logistic regression</title>
+		<author>
+			<persName><forename type="first">Lukas</forename><surname>Meier</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Sara</forename><surname>Van De</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Peter</forename><surname>Geer</surname></persName>
+		</author>
+		<author>
+			<persName><surname>B?hlmann</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="j">Journal of the Royal Statistical Society: Series B (Statistical Methodology)</title>
+		<imprint>
+			<biblScope unit="volume">70</biblScope>
+			<biblScope unit="issue">1</biblScope>
+			<biblScope unit="page" from="53" to="71" />
+			<date type="published" when="1963">2008. 1963</date>
+		</imprint>
+	</monogr>
+	<note>A Michotte. The perception of causality</note>
+</biblStruct>
+
+<biblStruct xml:id="b35">
+	<analytic>
+		<title level="a" type="main">Human-level control through deep reinforcement learning</title>
+		<author>
+			<persName><forename type="first">Volodymyr</forename><surname>Mnih</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Koray</forename><surname>Kavukcuoglu</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">David</forename><surname>Silver</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Andrei</forename><forename type="middle">A</forename><surname>Rusu</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Joel</forename><surname>Veness</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">G</forename><surname>Marc</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Alex</forename><surname>Bellemare</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Martin</forename><surname>Graves</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Andreas</forename><forename type="middle">K</forename><surname>Riedmiller</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Georg</forename><surname>Fidjeland</surname></persName>
+		</author>
+		<author>
+			<persName><surname>Ostrovski</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="j">Nature</title>
+		<imprint>
+			<biblScope unit="volume">518</biblScope>
+			<biblScope unit="issue">7540</biblScope>
+			<biblScope unit="page">529</biblScope>
+			<date type="published" when="2015">2015</date>
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b36">
+	<analytic>
+		<title level="a" type="main">Covariance characterization by partial autocorrelation matrices</title>
+		<author>
+			<persName><forename type="first">M</forename><surname>Morf</surname></persName>
+		</author>
+		<author>
+			<persName><surname>Vieira</surname></persName>
+		</author>
+		<author>
+			<persName><surname>Kailath</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="j">The Annals of Statistics</title>
+		<imprint>
+			<biblScope unit="volume">6</biblScope>
+			<biblScope unit="issue">3</biblScope>
+			<biblScope unit="page" from="643" to="648" />
+			<date type="published" when="1978">1978</date>
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b37">
+	<analytic>
+		<title level="a" type="main">High-dimensional consistency in scorebased and hybrid structure learning</title>
+		<author>
+			<persName><forename type="first">Preetam</forename><surname>Nandy</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Alain</forename><surname>Hauser</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">H</forename><surname>Marloes</surname></persName>
+		</author>
+		<author>
+			<persName><surname>Maathuis</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="j">The Annals of Statistics</title>
+		<imprint>
+			<biblScope unit="volume">46</biblScope>
+			<biblScope unit="issue">6A</biblScope>
+			<biblScope unit="page" from="3151" to="3183" />
+			<date type="published" when="2018">2018</date>
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b38">
+	<analytic>
+		<title level="a" type="main">Synaptic plasticity, memory and the hippocampus: a neural network approach to causality</title>
+		<author>
+			<persName><forename type="first">Guilherme</forename><surname>Neves</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">F</forename><surname>Sam</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Tim Vp</forename><surname>Cooke</surname></persName>
+		</author>
+		<author>
+			<persName><surname>Bliss</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="j">Nature Reviews Neuroscience</title>
+		<imprint>
+			<biblScope unit="volume">9</biblScope>
+			<biblScope unit="issue">1</biblScope>
+			<biblScope unit="page">65</biblScope>
+			<date type="published" when="2008">2008</date>
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b39">
+	<monogr>
+		<title level="m" type="main">Probability, random variables and stochastic processes</title>
+		<author>
+			<persName><forename type="first">A</forename><surname>Papoulis</surname></persName>
+		</author>
+		<imprint>
+			<date type="published" when="1985">1985</date>
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b40">
+	<analytic>
+		<title level="a" type="main">Causality: models, reasoning, and inference</title>
+		<author>
+			<persName><forename type="first">Judea</forename><surname>Pearl</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="j">IIE Transactions</title>
+		<imprint>
+			<biblScope unit="volume">34</biblScope>
+			<biblScope unit="issue">6</biblScope>
+			<biblScope unit="page" from="583" to="589" />
+			<date type="published" when="2002">2002. 2009</date>
+			<publisher>Judea Pearl. Causality. Cambridge university press</publisher>
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b41">
+	<analytic>
+		<title level="a" type="main">Causal inference in statistics: An overview</title>
+		<author>
+			<persName><forename type="first">Judea</forename><surname>Pearl</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="j">Statistics surveys</title>
+		<imprint>
+			<biblScope unit="volume">3</biblScope>
+			<biblScope unit="page" from="96" to="146" />
+			<date type="published" when="2009">2009</date>
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b42">
+	<monogr>
+		<title level="m" type="main">Elements of causal inference: foundations and learning algorithms</title>
+		<author>
+			<persName><forename type="first">Jonas</forename><surname>Peters</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Dominik</forename><surname>Janzing</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Bernhard</forename><surname>Sch?lkopf</surname></persName>
+		</author>
+		<imprint>
+			<date type="published" when="2017">2017</date>
+			<publisher>MIT press</publisher>
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b43">
+	<analytic>
+		<title/>
+		<ptr target="http://www.physionet.org/" />
+	</analytic>
+	<monogr>
+		<title level="j">PhysioNet. Physionet data</title>
+		<imprint/>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b44">
+	<analytic>
+		<title level="a" type="main">Performance of different synchronization measures in real data: a case study on electroencephalographic signals</title>
+		<author>
+			<persName><surname>R Quian Quiroga</surname></persName>
+		</author>
+		<author>
+			<persName><surname>Kraskov</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Peter</forename><surname>Kreuz</surname></persName>
+		</author>
+		<author>
+			<persName><surname>Grassberger</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="j">Physical Review E</title>
+		<imprint>
+			<biblScope unit="volume">65</biblScope>
+			<biblScope unit="issue">4</biblScope>
+			<biblScope unit="page">41903</biblScope>
+			<date type="published" when="2002">2002</date>
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b45">
+	<monogr>
+		<title level="m" type="main">The dataset can be downloaded from</title>
+		<author>
+			<persName><surname>Rodrigo Quian Quiroga</surname></persName>
+		</author>
+		<ptr target="URLwww.vis.caltech.edu/~rodri" />
+		<imprint/>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b46">
+	<analytic>
+		<title level="a" type="main">Group sparse regularization for deep neural networks</title>
+		<author>
+			<persName><forename type="first">Simone</forename><surname>Scardapane</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Danilo</forename><surname>Comminiello</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Amir</forename><surname>Hussain</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Aurelio</forename><surname>Uncini</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="j">Neurocomputing</title>
+		<imprint>
+			<biblScope unit="volume">241</biblScope>
+			<biblScope unit="page" from="81" to="89" />
+			<date type="published" when="2017">2017</date>
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b47">
+	<analytic>
+		<title level="a" type="main">Perceptual causality and animacy</title>
+		<author>
+			<persName><forename type="first">J</forename><surname>Brian</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Patrice</forename><forename type="middle">D</forename><surname>Scholl</surname></persName>
+		</author>
+		<author>
+			<persName><surname>Tremoulet</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="j">Trends in cognitive sciences</title>
+		<imprint>
+			<biblScope unit="volume">4</biblScope>
+			<biblScope unit="issue">8</biblScope>
+			<biblScope unit="page" from="299" to="309" />
+			<date type="published" when="2000">2000</date>
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b48">
+	<analytic>
+		<title level="a" type="main">Measuring information transfer</title>
+		<author>
+			<persName><forename type="first">Thomas</forename><surname>Schreiber</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="j">Physical review letters</title>
+		<imprint>
+			<biblScope unit="volume">85</biblScope>
+			<biblScope unit="issue">2</biblScope>
+			<biblScope unit="page">461</biblScope>
+			<date type="published" when="2000">2000</date>
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b49">
+	<analytic>
+		<title level="a" type="main">Granger causality analysis in neuroscience and neuroimaging</title>
+		<author>
+			<persName><forename type="first">K</forename><surname>Anil</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Adam</forename><forename type="middle">B</forename><surname>Seth</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Lionel</forename><surname>Barrett</surname></persName>
+		</author>
+		<author>
+			<persName><surname>Barnett</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="j">Journal of Neuroscience</title>
+		<imprint>
+			<biblScope unit="volume">35</biblScope>
+			<biblScope unit="issue">8</biblScope>
+			<biblScope unit="page" from="3293" to="3297" />
+			<date type="published" when="2015">2015</date>
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b50">
+	<monogr>
+		<title level="m" type="main">Scalable matrix-valued kernel learning for high-dimensional nonlinear multivariate regression and granger causality</title>
+		<author>
+			<persName><forename type="first">Vikas</forename><surname>Sindhwani</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Minh</forename><forename type="middle">Ha</forename><surname>Quang</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Aur?lie C</forename><surname>Lozano</surname></persName>
+		</author>
+		<idno type="arXiv">arXiv:1210.4792</idno>
+		<imprint>
+			<date type="published" when="2012">2012</date>
+		</imprint>
+	</monogr>
+	<note type="report_type">arXiv preprint</note>
+</biblStruct>
+
+<biblStruct xml:id="b51">
+	<monogr>
+		<title level="m" type="main">Causation, prediction, and search</title>
+		<author>
+			<persName><forename type="first">Peter</forename><surname>Spirtes</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">N</forename><surname>Clark</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Richard</forename><surname>Glymour</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">David</forename><surname>Scheines</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Christopher</forename><surname>Heckerman</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Gregory</forename><surname>Meek</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Thomas</forename><surname>Cooper</surname></persName>
+		</author>
+		<author>
+			<persName><surname>Richardson</surname></persName>
+		</author>
+		<imprint>
+			<date type="published" when="2000">2000</date>
+			<publisher>MIT press</publisher>
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b52">
+	<analytic>
+		<title level="a" type="main">Interpreting the evidence on money-income causality</title>
+		<author>
+			<persName><forename type="first">H</forename><surname>James</surname></persName>
+		</author>
+		<author>
+			<persName><surname>Stock</surname></persName>
+		</author>
+		<author>
+			<persName><surname>Mark W Watson</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="j">Journal of Econometrics</title>
+		<imprint>
+			<biblScope unit="volume">40</biblScope>
+			<biblScope unit="issue">1</biblScope>
+			<biblScope unit="page" from="161" to="181" />
+			<date type="published" when="1989">1989</date>
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b53">
+	<analytic>
+		<title level="a" type="main">The max-min hill-climbing bayesian network structure learning algorithm</title>
+		<author>
+			<persName><forename type="first">Ioannis</forename><surname>Tsamardinos</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Laura</forename><forename type="middle">E</forename><surname>Brown</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Constantin</forename><forename type="middle">F</forename><surname>Aliferis</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="j">Machine learning</title>
+		<imprint>
+			<biblScope unit="volume">65</biblScope>
+			<biblScope unit="issue">1</biblScope>
+			<biblScope unit="page" from="31" to="78" />
+			<date type="published" when="2006">2006</date>
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b54">
+	<analytic>
+		<title level="a" type="main">Settable systems: an extension of pearl&apos;s causal model with optimization, equilibrium, and learning</title>
+		<author>
+			<persName><forename type="first">Halbert</forename><surname>White</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Karim</forename><surname>Chalak</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="j">Journal of Machine Learning Research</title>
+		<imprint>
+			<biblScope unit="volume">10</biblScope>
+			<biblScope unit="page" from="1759" to="1799" />
+			<date type="published" when="2009-08">Aug. 2009</date>
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b55">
+	<analytic>
+		<title level="a" type="main">Granger causality and dynamic structural systems</title>
+		<author>
+			<persName><forename type="first">Halbert</forename><surname>White</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Xun</forename><surname>Lu</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="j">Journal of Financial Econometrics</title>
+		<imprint>
+			<biblScope unit="volume">8</biblScope>
+			<biblScope unit="issue">2</biblScope>
+			<biblScope unit="page" from="193" to="243" />
+			<date type="published" when="2010">2010</date>
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b56">
+	<analytic>
+		<title level="a" type="main">Linking granger causality and the pearl causal model with settable systems</title>
+		<author>
+			<persName><forename type="first">Halbert</forename><surname>White</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Karim</forename><surname>Chalak</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Xun</forename><surname>Lu</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="m">NIPS Mini-Symposium on Causality in Time Series</title>
+				<imprint>
+			<date type="published" when="2011">2011</date>
+			<biblScope unit="page" from="1" to="29" />
+		</imprint>
+	</monogr>
+</biblStruct>
+
+<biblStruct xml:id="b57">
+	<analytic>
+		<title level="a" type="main">Phenomenal causality: Impressions of pulling in the visual perception of objects in motion</title>
+		<author>
+			<persName><forename type="first">A</forename><surname>Peter</surname></persName>
+		</author>
+		<author>
+			<persName><forename type="first">Alan</forename><surname>White</surname></persName>
+		</author>
+		<author>
+			<persName><surname>Milne</surname></persName>
+		</author>
+	</analytic>
+	<monogr>
+		<title level="j">The American journal of psychology</title>
+		<imprint>
+			<biblScope unit="volume">110</biblScope>
+			<biblScope unit="issue">4</biblScope>
+			<biblScope unit="page">573</biblScope>
+			<date type="published" when="1997">1997</date>
+		</imprint>
+	</monogr>
+</biblStruct>
+
+				</listBibl>
+			</div>
+		</back>
+	</text>
+</TEI>
