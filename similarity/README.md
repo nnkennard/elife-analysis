@@ -26,7 +26,7 @@ These scripts require input as a json file, with the format:
           "review_id": <review_id>,
           "review_text": <review_text>,
           "reviewer_id": <reviewer_id>,
-          "rebuttal_text": <optional_rebuttal_text>
+          "rebuttal_text": <optional_rebuttal_text> // None 
         },
         
       ],
