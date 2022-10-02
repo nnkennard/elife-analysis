@@ -43,6 +43,7 @@ def main():
   cur.execute("""CREATE TABLE citation(
     citer_id INTEGER,
     citee_id INTEGER
+    source_type text NOT NULL,
     )""")
 
   con.commit()

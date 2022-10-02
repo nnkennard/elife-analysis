@@ -1,82 +1,107 @@
 import csv
 import sqlite3
-"""Random notes
-
-  * Different ways a paper can be IDed
-    * PMID (PM)
-    * DOI (PM)
-    * ISSN (PM)
 
 
-
-"""
-
-
-
-
-def create_pubmed_alias(cursor, paper, info):
-  pass
-  # Check for scientist
-  # Maybe create scientist
-  # Create alias
+# TODO(dss): what is the paper identifier in pubmed reference objects?
+class Paper(object):
+  IDENTIFIERS = "elife_manuscript_id pm_id doi issn".split()
+  USER_KEYS = (
+      IDENTIFIERS +
+      "title date_revised date_completed journal_pub_date journal".split())
+  # ALL_KEYS = "source_type paper_id".split() + USER_KEYS
 
 
-def create_pubmed_citations(cursor, citer, pubmed_citation):
-  pass
-  # Check for citee
-  # Maybe create citee
-  # Create alias
+# TODO(dss): do we have any other person identifiers?
+class Person(object):
+  IDENTIFIERS = "elife_id orcid".split()
+  USER_KEYS = IDENTIFIERS
 
 
-PAPER_KEYS = "elife_manuscript_id pm_id doi issn".split()
-
-
-def insert_or_create_paper(cursor, paper_row):
+def check_for_any_keys(cursor, row, table, identifiers):
   key_string = " OR ".join([
-      f"{key} == {value}" for key, value in paper_row.items()
-      if key in PAPER_KEYS and value
+      f"{key} == {row[key]}" for key in identifiers if key in row and row[key]
   ])
   found_counter = {}
   maybe_matching_rows = cursor.execute(f"""
-    SELECT * FROM paper WHERE {key_string}
+    SELECT * FROM {table} WHERE {key_string}
   """).fetchall()
   assert len(maybe_matching_rows) in [0, 1]
+  return maybe_matching_rows
+
+
+def insert_or_update_paper(cursor, paper_row):
+  maybe_matching_rows = check_for_any_keys(cursor, paper_row, "paper",
+                                           Paper.IDENTIFIERS)
   if maybe_matching_rows:
+    # Check for updates and/or conflicts
     (row,) = maybe_matching_rows
     return row[0]
   else:
-    value_string_builder = {}
-    for (key) in (
-        "pm_id issn doi title date_revised date_completed journal_pub_date".
-        split()):
-      if key in paper_row:
-        value_string_builder[key] = paper_row[key]
-    sorted_keys = list(sorted(value_string_builder.keys()))
-    key_string = ", ".join(["source_type", "paper_id"] + sorted_keys)
+    builder = {
+        key: paper_row[key] for key in Paper.USER_KEYS if key in paper_row
+    }
+    key_string = ", ".join(["source_type", "paper_id"] + sorted(builder.keys()))
     value_string = f'"Pubmed", NULL,' + ", ".join(
-        f'"{value_string_builder[key]}"' for key in sorted_keys)
-
-    cursor.execute(
+        f'"{builder[key]}"' for key in sorted(builder.keys()))
+    k = cursor.execute(
         f""" INSERT INTO paper({key_string}) VALUES ({value_string});""")
-    (row,) = cursor.execute(f"""SELECT paper_id FROM paper ORDER BY paper_id
-    DESC LIMIT 1""").fetchall()
+    (row,) = cursor.execute(f"""SELECT last_insert_rowid()""").fetchall()
     return row[0]
 
 
-def process_pubmed_row(cursor, row):
-  paper_id = insert_or_create_paper(cursor, row)
+def insert_or_update_person(cursor, person_row):
+  maybe_matching_rows = check_for_any_keys(cursor, person_row, "person",
+                                           Person.IDENTIFIERS)
+  if maybe_matching_rows:
+    (row,) = maybe_matching_rows
+    # Check for updates and/or conflicts
+    return row[0]
+  else:
+    builder = {
+        key: person_row[key] for key in Person.USER_KEYS if key in person_row
+    }
+    key_string = ", ".join(["person_id"] + sorted(builder.keys()))
+    value_string = f"NULL," + ", ".join(
+        f'"{builder[key]}"' for key in sorted(builder.keys()))
+    k = cursor.execute(
+        f""" INSERT INTO paper({key_string}) VALUES ({value_string});""")
+    (row,) = cursor.execute(f"""SELECT last_insert_rowid()""").fetchall()
+    return row[0]
 
-  # Check if paper is in Papers
-  # If no, create paper
-  # Create aliases
-  # Alias is uniquely identified by order and paper
-  # Create citations
+
+def process_pubmed_citation(cursor, row, citer_id):
+  citee_id = insert_or_update_paper(row)
+  # INSERT INTO citation VALUES citer_id, citee_id, PubMed
+
+
+def insert_or_update_alias(cursor, row, paper_id, author_i):
+  person_id = insert_or_update_person(row)
+  # INSERT INTO authorship VALUES paper_id, person_id, author_order
+  # INSERT INTO alias VALUES paper_id, person_id, first_name, last_name, affiliation
+  # ^ These should not lead to conflicts because this is the first time this pair is in here
+
+
+def process_pubmed_row(cursor, row):
+  paper_id = insert_or_update_paper(cursor, row)
+  # for author_i, author in enumerate(row['authors']):
+  #  insert_or_update_alias(cursor, row, paper_id, author_i)
+  # for reference in row['references']:
+  # process_pubmed_citations(reference)
 
 
 def pubmed_row_generator():
   with open("pubmed.csv", "r") as f:
     pubmed_reader = csv.DictReader(f)
     for row in pubmed_reader:
+      # TODO(dss): before yielding, modify the keys to match the ones in Paper
+      # and Person keys. Row should be in the format:
+      # { key1: value1,
+      #   key2: value2,
+      #   ...
+      #   "authors": [author_dict_1, author_dict_2, ...]
+      #   "references": [reference_dict_1, reference_dict_2, ...]
+      # }
+
       yield row
 
 
@@ -87,6 +112,9 @@ def main():
 
   for pubmed_row in pubmed_row_generator():
     process_pubmed_row(cur, pubmed_row)
+
+  # TODO(dss): Share example eLife data with Neha to start process_elife_row
+
   con.commit()
 
 
