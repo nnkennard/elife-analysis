@@ -1,5 +1,8 @@
 import sqlite3
 
+# I'm making primary keys INTEGER and everything else text to save time
+# elsewhere.
+
 
 def main():
 
@@ -37,13 +40,13 @@ def main():
   cur.execute("""CREATE TABLE authorship(
     person_id INTEGER PRIMARY KEY,
     paper_id INTEGER,
-    author_order INTEGER
+    author_order TEXT
     )""")
 
   cur.execute("""CREATE TABLE citation(
     citer_id INTEGER,
-    citee_id INTEGER
-    source_type text NOT NULL,
+    citee_id INTEGER,
+    source_type text NOT NULL
     )""")
 
   con.commit()
