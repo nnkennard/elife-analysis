@@ -1,0 +1,5 @@
+pmid	title	date_completed	date_revised	journal_pub_date	issn	doi	authors
+1	a	january	february	march	34		[{"first":"Neha","last":"Kennard","email":"kennard@cs.umass.edu","orcid":"35","pmid":"22"},{"first":"Daniel","last":"Smith","email":"dss@cs.umass.edu","orcid":"94","pmid":"48"}]
+2	b	january	february	march		2	[{"first":"Neha2","last":"Kennard","email":"kennard1@cs.umass.edu","orcid":"667","pmid":"100"},{"first":"Daniel2","last":"Smith","email":"dss1@cs.umass.edu","pmid":"1"}]
+3	c	january	february	march	3	4	[{"first":"Neha3","last":"Kennard","email":"kennard2@cs.umass.edu","orcid":"5","pmid":"2"},{"first":"Daniel3","last":"Smith","email":"dss2@cs.umass.edu","pmid":"6"}]
+4	d	january	february	march	2		[{"first":"Neha4","last":"Kennard","email":"kennard3@cs.umass.edu","orcid":"7","pmid":"3"},{"first":"Daniel4","last":"Smith","email":"dss3@cs.umass.edu","orcid":"8","pmid":"4"}]
