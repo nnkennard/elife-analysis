@@ -1,55 +1,63 @@
-import sqlite3
-
-# I'm making primary keys INTEGER and everything else text to save time
-# elsewhere.
+import sqlalchemy
+from sqlalchemy import Table, Column, Integer, String, MetaData
 
 
 def main():
 
-  con = sqlite3.connect("elife.db")
-  cur = con.cursor()
-  cur.execute("""CREATE TABLE paper(
-    paper_id INTEGER PRIMARY KEY,
-    source_type TEXT NOT NULL,
-    elife_manuscript_id TEXT,
-    pm_id TEXT,
-    doi TEXT,
-    issn TEXT,
-    title TEXT NOT NULL,
-    date_revised TEXT,
-    date_completed TEXT,
-    journal_pub_date TEXT
-    )""")
+  engine = sqlalchemy.create_engine('sqlite:///elife.db')
+  meta = MetaData()
 
-  cur.execute("""CREATE TABLE person(
-    person_id INTEGER PRIMARY KEY,
-    elife_id TEXT,
-    orcid TEXT
-    )""")
+  paper = Table(
+      "paper",
+      meta,
+      Column("paper_id", Integer, primary_key=True),
+      Column("source_type", String),
+      Column("elife_manuscript_id", String),
+      Column("pm_id", String),
+      Column("doi", String),
+      Column("issn", String),
+      Column("title", String),
+      Column("date_revised", String),
+      Column("date_completed", String),
+      Column("journal_pub_date", String),
+  )
 
-  cur.execute("""CREATE TABLE alias(
-    person_id INTEGER,
-    paper_id INTEGER,
+  person = Table(
+      "person",
+      meta,
+      Column("person_id", Integer, primary_key=True),
+      Column("elife_id", String),
+      Column("orcid", String),
+      Column("pm_author_id", String),
+  ) 
 
-    last_name TEXT,
-    first_name TEXT,
-    initials TEXT,
-    affiliation TEXT
-    )""")
+  authorship = Table(
+      "authorship",
+      meta,
+      Column("person_id", Integer, foreign_key="person.person_id"),
+      Column("paper_id", Integer, foreign_key="paper.paper_id"),
+      Column("author_order", Integer),
+  )
 
-  cur.execute("""CREATE TABLE authorship(
-    person_id INTEGER PRIMARY KEY,
-    paper_id INTEGER,
-    author_order TEXT
-    )""")
+  alias = Table(
+      "alias",
+      meta,
+      Column("person_id", Integer, foreign_key="person.person_id"),
+      Column("paper_id", Integer, foreign_key="paper.paper_id"),
+      Column("first_name", String),
+      Column("last_name", String),
+      Column("affiliation", String),
+      Column("initials", String),
+  )
 
-  cur.execute("""CREATE TABLE citation(
-    citer_id INTEGER,
-    citee_id INTEGER,
-    source_type text NOT NULL
-    )""")
+  citation = Table(
+  "citation",
+  meta,
+  Column("citer_id", Integer, foreign_key="paper.paper_id"),
+  Column("citee_id", Integer, foreign_key="paper.paper_id")
+  )
 
-  con.commit()
+  meta.create_all(engine)
 
 
 if __name__ == "__main__":
