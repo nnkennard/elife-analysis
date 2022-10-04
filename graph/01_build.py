@@ -21,6 +21,7 @@ def pubmed_row_generator():
 			# Author dicts should be in the format
 			# { key1: value1,... } etc., but if there is no value provided for a
 			# field e.g. ORCID, just don't include the key in the dict.
+            # Daniel!
 
       yield row
 
