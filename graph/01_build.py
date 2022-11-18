@@ -6,25 +6,59 @@ from sqlalchemy.orm import Session
 
 from graph_lib import Paper, Person, Authorship, Alias
 
+from google.cloud import bigquery
+from google.cloud import storage
+
+
+# BQ_CLIENT = bigquery.Client()
+BQ_PUBMED_DATA = bigquery.TableReference.from_string(table_id="gse-nero-dmcfarla-mimir.PubMed.PubMed_Baseline")
+BQ_PUBMED_ITERATOR = BQ_CLIENT.list_rows(BQ_PUBMED_DATA, page_size = 100).to_dataframe_iterable()
 
 def pubmed_row_generator():
-    with open("pubmed_data.tsv", "r") as f:
-        pubmed_reader = csv.DictReader(f, delimiter="\t")
-        for row in pubmed_reader:
-            # TODO(dss): before yielding, modify the keys to match the ones in paper
-            # and person keys. Row should be in the format:
-            # { key1: value1,
-            #   key2: value2,
-            #   ...
-            #   "authors": [author_dict_1, author_dict_2, ...]
-            #   "references": [reference_dict_1, reference_dict_2, ...]
-            # }
-            # Author dicts should be in the format
-            # { key1: value1,... } etc., but if there is no value provided for a
-            # field e.g. ORCID, just don't include the key in the dict.
-            # Daniel!
 
-            yield row
+  pubmed_cols = ['PMID', 'ArticleTitle', 
+                 'DateCompleted','DateRevised', 
+                 'JournalPubDate', 'ISSN', 'DOI',  
+                 'AuthorList', 'ReferenceList']
+
+  new_cols = ['pmid', 'title', 'date_completed', 
+              'date_revised', 'journal_pub_date', 
+              'issn', 'doi', 'authors', 'references']
+
+  col_map = dict(zip(pubmed_cols,new_cols))
+
+  new_auth_keys = ['last','first','affiliation', 'orcid', 'email']
+
+  for df in BQ_PUBMED_ITERATOR:
+    # select and rename subset of cols
+    df = df[pubmed_cols]
+    df.rename(columns=col_map, inplace=True)
+      
+    # select and rename subset of auth dict items
+    for index, row in df.iterrows():
+      
+      authors = []
+      for author_dct in row['authors']:
+        author_dct.pop("Initials", None)
+        author_dct.pop("Order", None)
+
+        # Grab email if poss
+        if author_dct["Affiliation"] is not None:
+          for tkn in author_dct['Affiliation'].split():
+            if "@" in tkn: 
+              author_dct['email'] = tkn
+            else: 
+              author_dct['email'] = None
+        else: 
+          author_dct['email'] = None
+
+        # rekey dict
+        for old_k, new_k in zip(author_dct.keys(), new_auth_keys):
+          author_dct[new_k] = author_dct.pop(old_k)
+
+        authors.append(author_dct)
+      row['authors'] = authors
+      yield row
 
 
 def get_or_create_author_id(author_row, session):
