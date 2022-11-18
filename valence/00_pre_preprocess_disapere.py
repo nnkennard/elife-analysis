@@ -38,7 +38,7 @@ def main():
         sentences.append({"identifier": identifier, "text": sentence["text"]})
         labels.append({
             "identifier": identifier,
-            "label": 0 if sentence["pol"] == "none" else 1,
+            "label": 0 if sentence["polarity"] == "none" else 1,
         })
 
     with open(f"{output_dir}/sentences.jsonl", "w") as f:

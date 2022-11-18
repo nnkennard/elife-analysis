@@ -1,6 +1,5 @@
 import argparse
 import collections
-import glob
 import json
 import numpy as np
 import pickle
@@ -16,26 +15,31 @@ from transformers import BertTokenizer, BertModel
 
 import classification_lib
 
-parser = argparse.ArgumentParser(description="Create examples for WS training")
+TRAIN, EVAL, PREDICT = "train eval predict".split()
+
+parser = argparse.ArgumentParser(
+  description="Train BERT model for DISAPERE classification tasks")
 parser.add_argument(
     "-d",
     "--data_dir",
     type=str,
-    help="path to data file containing score jsons",
+    help="path to directory containing train, dev and test jsons"
 )
 parser.add_argument(
     "-m",
     "--mode",
+    choices=(TRAIN, EVAL, PREDICT),
     type=str,
     help="train eval or predict",
 )
 
+
+# Hyperparameters
 DEVICE = "cuda"
 EPOCHS = 100
 PATIENCE = 20
 BATCH_SIZE = 8
 LEARNING_RATE = 2e-5
-TRAIN, EVAL, PREDICT = "train eval predict".split()
 PRE_TRAINED_MODEL_NAME = "bert-base-uncased"
 
 HistoryItem = collections.namedtuple(
@@ -44,10 +48,12 @@ HistoryItem = collections.namedtuple(
 Example = collections.namedtuple("Example", "identifier text target".split())
 
 
-def get_label(original_label):
-  return 0 if original_label == "none" else 1
+# TODO(nnk): what is this below?
+#def get_label(original_label):
+#  return 0 if original_label == "none" else 1
 
-
+# Wrapper around the tokenizer specifying the details of the BERT input
+# encoding.
 tokenizer_fn = lambda tok, text: tok.encode_plus(
     text,
     add_special_tokens=True,
@@ -59,8 +65,8 @@ tokenizer_fn = lambda tok, text: tok.encode_plus(
     return_tensors="pt",
 )
 
+# An identity matrix to easily switch to and from one-hot encoding.
 EYE_2 = np.eye(2, dtype=np.float64)
-
 
 class PolarityDetectionDataset(Dataset):
 
@@ -94,13 +100,13 @@ class PolarityDetectionDataset(Dataset):
     }
 
 
-class SentimentClassifier(nn.Module):
+class PolarityClassifier(nn.Module):
 
-  def __init__(self, n_classes):
-    super(SentimentClassifier, self).__init__()
+  def __init__(self):
+    super(PolarityClassifier, self).__init__()
     self.bert = BertModel.from_pretrained(PRE_TRAINED_MODEL_NAME)
     self.drop = nn.Dropout(p=0.3)
-    self.out = nn.Linear(self.bert.config.hidden_size, n_classes)
+    self.out = nn.Linear(self.bert.config.hidden_size, 2)
 
   def forward(self, input_ids, attention_mask):
     bert_output = self.bert(input_ids=input_ids, attention_mask=attention_mask)
@@ -184,6 +190,10 @@ def train_or_eval(
 
 
 def do_train(tokenizer, model, loss_fn, data_dir):
+  """Train on train set, validating on validation set.
+  """
+
+  # We don't mess around with hyperparameters too much, just use decent ones.
   hyperparams = {
       "epochs": EPOCHS,
       "patience": PATIENCE,
@@ -197,9 +207,10 @@ def do_train(tokenizer, model, loss_fn, data_dir):
       val_data_loader,
   ) = build_data_loaders(data_dir, tokenizer)
 
+
+  # Optimizer and scheduler (boilerplatey)
   optimizer = AdamW(model.parameters(), lr=LEARNING_RATE)
   total_steps = len(train_data_loader) * EPOCHS
-
   scheduler = transformers.get_linear_schedule_with_warmup(
       optimizer, num_warmup_steps=0, num_training_steps=total_steps)
 
@@ -207,14 +218,17 @@ def do_train(tokenizer, model, loss_fn, data_dir):
   best_accuracy = 0
   best_accuracy_epoch = None
 
+  # EPOCHS is the maximum number of epochs we will run.
   for epoch in range(EPOCHS):
 
+    # If no improvement is seen in PATIENCE iterations, we quit.
     if best_accuracy_epoch is not None and epoch - best_accuracy_epoch > PATIENCE:
       break
 
     print(f"Epoch {epoch + 1}/{EPOCHS}")
     print("-" * 10)
 
+    # Run train_or_eval ono train set in TRAIN mode, backpropagating
     train_acc, train_loss = train_or_eval(
         TRAIN,
         model,
@@ -225,14 +239,17 @@ def do_train(tokenizer, model, loss_fn, data_dir):
         scheduler=scheduler,
     )
 
+    # Run train_or_eval on validation set in EVAL mode
     val_acc, val_loss = train_or_eval(EVAL, model, val_data_loader, loss_fn,
                                       DEVICE)
 
+    # Recording metadata
     history.append(HistoryItem(epoch, train_acc, train_loss, val_acc, val_loss))
     for k, v in history[-1]._asdict().items():
       print(k + "\t", v)
     print()
 
+    # Save the model parameters if this is the best model seen so far
     if val_acc > best_accuracy:
       torch.save(model.state_dict(), f"ckpt/best_bert_model.bin")
       best_accuracy = val_acc
@@ -243,15 +260,19 @@ def do_train(tokenizer, model, loss_fn, data_dir):
 
 
 def do_eval(tokenizer, model, loss_fn, data_dir):
+  """Evaluate (on dev set?) without backpropagating.
+  """
   assert "dev" in data_dir
   test_data_loader = create_data_loader(
       data_dir,
       tokenizer,
   )
 
+  # Get best model
   model.load_state_dict(torch.load(f"ckpt/best_bert_model.bin"))
 
-  dev_acc, dev_loss = train_or_eval("eval", model, test_data_loader, loss_fn,
+  
+  dev_acc, dev_loss = train_or_eval(EVAL, model, test_data_loader, loss_fn,
                                     DEVICE)
 
   print("Dev accuracy", dev_acc)
@@ -287,7 +308,7 @@ def main():
   assert args.mode in [TRAIN, EVAL, PREDICT]
 
   tokenizer = BertTokenizer.from_pretrained(PRE_TRAINED_MODEL_NAME)
-  model = SentimentClassifier(2).to(DEVICE)
+  model = PolarityClassifier().to(DEVICE)
   loss_fn = nn.BCEWithLogitsLoss().to(DEVICE)
 
   if args.mode == TRAIN:
