@@ -6,6 +6,7 @@ MODES = [TRAIN, EVAL, PREDICT]
 
 
 def get_features_and_labels(data_dir, get_labels=False):
+
   features = []
   texts = []
   identifiers = []
