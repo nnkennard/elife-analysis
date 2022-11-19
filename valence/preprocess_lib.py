@@ -1,6 +1,6 @@
 import collections
 import json
-import stanza
+#import stanza
 
 
 class Node(object):
@@ -75,11 +75,11 @@ def split_identifier(identifier):
   return pieces[0], int(pieces[1])
 
 
-SENTENCIZE_PIPELINE = stanza.Pipeline("en", processors="tokenize")
-STANZA_PIPELINE = stanza.Pipeline(
-    "en",
-    processors="tokenize,lemma,pos,depparse,constituency",
-    tokenize_no_ssplit=True)
+#SENTENCIZE_PIPELINE = stanza.Pipeline("en", processors="tokenize")
+#STANZA_PIPELINE = stanza.Pipeline(
+#    "en",
+#    processors="tokenize,lemma,pos,depparse,constituency",
+#    tokenize_no_ssplit=True)
 
 
 def process_sentence(sentence_text):

@@ -44,7 +44,7 @@ LEARNING_RATE = 2e-5
 PRE_TRAINED_MODEL_NAME = "bert-base-uncased"
 
 HistoryItem = collections.namedtuple(
-    "HistoryItem", "epoch train_acc train_loss val_acc val_loss".split()
+    "HistoryItem", "epoch train_acc train_loss dev_acc dev_loss".split()
 )
 
 Example = collections.namedtuple("Example", "identifier text target".split())
@@ -63,20 +63,19 @@ tokenizer_fn = lambda tok, text: tok.encode_plus(
     return_tensors="pt",
 )
 
-# An identity matrix to easily switch to and from one-hot encoding.
-EYE_2 = np.eye(2, dtype=np.float64)
-
 
 class PolarityDetectionDataset(Dataset):
     """A torch.utils.data.Dataset for binary classification."""
     def __init__(self, data_dir, tokenizer, max_len=512):
         (
             self.identifiers,
-            _,
             self.texts,
             self.target_indices,
-        ) = classification_lib.get_features_and_labels(data_dir, get_labels=True)
-        self.targets = [EYE_2[int(i)] for i in self.target_indices]
+        ) = classification_lib.get_text_and_labels(data_dir, get_labels=True)
+        target_set = set(self.target_indices)
+        assert list(sorted(target_set)) == list(range(len(target_set)))
+        eye = np.eye(len(target_set), dtype=np.float64) # An identity matrix to easily switch to and from one-hot encoding.
+        self.targets = [eye[int(i)] for i in self.target_indices]
         self.tokenizer = tokenizer
         self.max_len = max_len
 
@@ -121,14 +120,13 @@ def create_data_loader(data_dir, tokenizer):
 
 
 def build_data_loaders(data_dir, tokenizer):
-    assert "train" in data_dir
     return (
         create_data_loader(
-            data_dir,
+            f'{data_dir}/train/',
             tokenizer,
         ),
         create_data_loader(
-            data_dir.replace("train", "dev"),
+            f'{data_dir}/dev/',
             tokenizer,
         ),
     )
@@ -188,7 +186,7 @@ def train_or_eval(
 
 
 def do_train(tokenizer, model, loss_fn, data_dir):
-    """Train on train set, validating on validation set."""
+    """Train on train set, validating on dev set."""
 
     # We don't mess around with hyperparameters too much, just use decent ones.
     hyperparams = {
@@ -201,7 +199,7 @@ def do_train(tokenizer, model, loss_fn, data_dir):
 
     (
         train_data_loader,
-        val_data_loader,
+        dev_data_loader,
     ) = build_data_loaders(data_dir, tokenizer)
 
     # Optimizer and scheduler (boilerplatey)
@@ -236,19 +234,19 @@ def do_train(tokenizer, model, loss_fn, data_dir):
             scheduler=scheduler,
         )
 
-        # Run train_or_eval on validation set in EVAL mode
-        val_acc, val_loss = train_or_eval(EVAL, model, val_data_loader, loss_fn, DEVICE)
+        # Run train_or_eval on dev set in EVAL mode
+        dev_acc, dev_loss = train_or_eval(EVAL, model, dev_data_loader, loss_fn, DEVICE)
 
         # Recording metadata
-        history.append(HistoryItem(epoch, train_acc, train_loss, val_acc, val_loss))
+        history.append(HistoryItem(epoch, train_acc, train_loss, dev_acc, dev_loss))
         for k, v in history[-1]._asdict().items():
             print(k + "\t", v)
         print()
 
         # Save the model parameters if this is the best model seen so far
-        if val_acc > best_accuracy:
+        if dev_acc > best_accuracy:
             torch.save(model.state_dict(), f"ckpt/best_bert_model.bin")
-            best_accuracy = val_acc
+            best_accuracy = dev_acc
             best_accuracy_epoch = epoch
 
     with open(f"ckpt/history.pkl", "wb") as f:

@@ -5,15 +5,13 @@ TRAIN, EVAL, PREDICT = "train eval predict".split()
 MODES = [TRAIN, EVAL, PREDICT]
 
 
-def get_features_and_labels(data_dir, get_labels=False):
+def get_text_and_labels(data_dir, get_labels=False):
 
-  features = []
   texts = []
   identifiers = []
-  with open(f"{data_dir}/features.jsonl", "r") as f:
+  with open(f"{data_dir}/sentences.jsonl", "r") as f:
     for line in f:
       example = json.loads(line)
-      features.append(example["features"])
       texts.append(example["text"])
       identifiers.append(example["identifier"])
   if get_labels:
@@ -26,4 +24,4 @@ def get_features_and_labels(data_dir, get_labels=False):
   else:
     labels = None
 
-  return identifiers, features, texts, labels
+  return identifiers, texts, labels
