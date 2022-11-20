@@ -64,7 +64,7 @@ tokenizer_fn = lambda tok, text: tok.encode_plus(
 )
 
 
-class PolarityDetectionDataset(Dataset):
+class ClassificationDataset(Dataset):
     """A torch.utils.data.Dataset for binary classification."""
     def __init__(self, data_dir, tokenizer, max_len=512):
         (
@@ -98,12 +98,14 @@ class PolarityDetectionDataset(Dataset):
         }
 
 
-class PolarityClassifier(nn.Module):
-    def __init__(self):
-        super(PolarityClassifier, self).__init__()
+class Classifier(nn.Module):
+    def __init__(self, num_classes):
+        super(Classifier, self).__init__()
         self.bert = BertModel.from_pretrained(PRE_TRAINED_MODEL_NAME)
         self.drop = nn.Dropout(p=0.3)
-        self.out = nn.Linear(self.bert.config.hidden_size, 2)
+        self.out = nn.Linear(self.bert.config.hidden_size, num_classes)
+        if num_classes == 2:
+            self.loss_fn = nn.BCEWithLogitsLoss() # Not sure if this is reasonable
 
     def forward(self, input_ids, attention_mask):
         bert_output = self.bert(input_ids=input_ids, attention_mask=attention_mask)
@@ -112,7 +114,7 @@ class PolarityClassifier(nn.Module):
 
 
 def create_data_loader(data_dir, tokenizer):
-    ds = PolarityDetectionDataset(
+    ds = ClassificationDataset(
         data_dir,
         tokenizer=tokenizer,
     )
@@ -136,7 +138,6 @@ def train_or_eval(
     mode,
     model,
     data_loader,
-    loss_fn,
     device,
     return_preds=False,
     optimizer=None,
@@ -169,7 +170,7 @@ def train_or_eval(
             _, preds = torch.max(outputs, dim=1)
             if return_preds:
                 results.append((d["identifier"], preds.cpu().numpy().tolist()))
-            loss = loss_fn(outputs, targets)
+            loss = model.loss_fn(outputs, targets)
             correct_predictions += torch.sum(preds == target_indices)
             losses.append(loss.item())
             if is_train:
@@ -185,7 +186,7 @@ def train_or_eval(
         return correct_predictions.double().item() / n_examples, np.mean(losses)
 
 
-def do_train(tokenizer, model, loss_fn, data_dir):
+def do_train(tokenizer, model, data_dir):
     """Train on train set, validating on dev set."""
 
     # We don't mess around with hyperparameters too much, just use decent ones.
@@ -228,14 +229,13 @@ def do_train(tokenizer, model, loss_fn, data_dir):
             TRAIN,
             model,
             train_data_loader,
-            loss_fn,
             DEVICE,
             optimizer=optimizer,
             scheduler=scheduler,
         )
 
         # Run train_or_eval on dev set in EVAL mode
-        dev_acc, dev_loss = train_or_eval(EVAL, model, dev_data_loader, loss_fn, DEVICE)
+        dev_acc, dev_loss = train_or_eval(EVAL, model, dev_data_loader, DEVICE)
 
         # Recording metadata
         history.append(HistoryItem(epoch, train_acc, train_loss, dev_acc, dev_loss))
@@ -253,7 +253,7 @@ def do_train(tokenizer, model, loss_fn, data_dir):
         pickle.dump(history, f)
 
 
-def do_eval(tokenizer, model, loss_fn, data_dir):
+def do_eval(tokenizer, model, data_dir):
     """Evaluate (on dev set?) without backpropagating."""
     assert "dev" in data_dir
     test_data_loader = create_data_loader(
@@ -264,7 +264,7 @@ def do_eval(tokenizer, model, loss_fn, data_dir):
     # Get best model
     model.load_state_dict(torch.load(f"ckpt/best_bert_model.bin"))
 
-    dev_acc, dev_loss = train_or_eval(EVAL, model, test_data_loader, loss_fn, DEVICE)
+    dev_acc, dev_loss = train_or_eval(EVAL, model, test_data_loader, DEVICE)
 
     print("Dev accuracy", dev_acc)
 
@@ -304,13 +304,13 @@ def main():
     assert args.mode in [TRAIN, EVAL, PREDICT]
 
     tokenizer = BertTokenizer.from_pretrained(PRE_TRAINED_MODEL_NAME)
-    model = PolarityClassifier().to(DEVICE)
-    loss_fn = nn.BCEWithLogitsLoss().to(DEVICE)
+    model = Classifier(2).to(DEVICE)
+    model.loss_fn.to(DEVICE)
 
     if args.mode == TRAIN:
-        do_train(tokenizer, model, loss_fn, args.data_dir)
+        do_train(tokenizer, model, args.data_dir)
     elif args.mode == EVAL:
-        do_eval(tokenizer, model, loss_fn, args.data_dir)
+        do_eval(tokenizer, model, args.data_dir)
     elif args.mode == PREDICT:
         do_predict(tokenizer, model, args.data_dir)
 
