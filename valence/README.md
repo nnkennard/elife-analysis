@@ -38,7 +38,7 @@ disapere_data/
         └── labels.jsonl
 ```
 
-## Training and evaluation
+## Training
 
 The `01_train_eval_predict.py` can be used to train a BERT model on data formatted by `00_prep_disapere.py`. 
 
@@ -72,3 +72,54 @@ disapere_data/
         │   best_bert_model.bin
         └── history.pkl
 ```
+
+## Evaluation
+
+For evaluation, the `01_train_eval_predict.py` uses the checkpoint created in `train` mode to evaluate various evaluation sets. Supply the name of the eval set (train/dev/test) with the `-e` flag.
+
+Example command:
+
+```
+python 01_train_eval_predict.py -d disapere_data/ -t review_action -m eval -e train
+```
+
+This just prints out the result on the evaluation set.
+
+## Preparing for prediction
+
+To prepare reviews (such as eLife reviews) for classification, convert them into a json file with the following format:
+
+```
+[
+  {
+    "review_id": "placeholder_review_1",
+    "review_text": "The authors convincingly demonstrate ..."
+  },
+  {
+    "review_id": "placeholder_review_2",
+    "review_text": "The data appear too preliminary ..."
+  },
+  {
+    "review_id": "placeholder_review_3",
+    "review_text": "Critical to the central points of..."
+  }
+]
+```
+
+Example command:
+
+```
+python 02_preprocess.py -i input_file.json -o predict_prepared_file.jsonl
+```
+
+## Prediction
+For prediction, the `01_train_eval_predict.py` uses the checkpoint created in `train` mode to make predictions on the output file created above. Supply the name of the prediction file with the `-p` flag, and make sure to provide the task (with the `-t` flag).
+
+Example command:
+
+```
+python 01_train_eval_predict.py -m predict -d disapere_data/ -t review_action -p predict_prepared_file.jsonl
+```
+
+This produces a new file in the same directory as the prepared file with the predicted labels.
+
