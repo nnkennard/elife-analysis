@@ -33,7 +33,12 @@ parser.add_argument(
     type=str,
     help="train eval or predict",
 )
-
+parser.add_argument(
+    "-t",
+    "--task",
+    type=str,
+    help="train eval or predict",
+)
 
 # Hyperparameters
 DEVICE = "cuda"
@@ -73,6 +78,7 @@ class ClassificationDataset(Dataset):
             self.target_indices,
         ) = classification_lib.get_text_and_labels(data_dir, get_labels=True)
         target_set = set(self.target_indices)
+        print(target_set)
         assert list(sorted(target_set)) == list(range(len(target_set)))
         eye = np.eye(len(target_set), dtype=np.float64) # An identity matrix to easily switch to and from one-hot encoding.
         self.targets = [eye[int(i)] for i in self.target_indices]
@@ -106,6 +112,8 @@ class Classifier(nn.Module):
         self.out = nn.Linear(self.bert.config.hidden_size, num_classes)
         if num_classes == 2:
             self.loss_fn = nn.BCEWithLogitsLoss() # Not sure if this is reasonable
+        else:
+            self.loss_fn = nn.CrossEntropyLoss()
 
     def forward(self, input_ids, attention_mask):
         bert_output = self.bert(input_ids=input_ids, attention_mask=attention_mask)
@@ -304,7 +312,8 @@ def main():
     assert args.mode in [TRAIN, EVAL, PREDICT]
 
     tokenizer = BertTokenizer.from_pretrained(PRE_TRAINED_MODEL_NAME)
-    model = Classifier(2).to(DEVICE)
+    #model = Classifier(2).to(DEVICE)
+    model = Classifier(7).to(DEVICE)
     model.loss_fn.to(DEVICE)
 
     if args.mode == TRAIN:
