@@ -2,6 +2,7 @@ import argparse
 import collections
 import json
 import numpy as np
+import os
 import pickle
 import torch
 import torch.nn as nn
@@ -26,6 +27,13 @@ parser.add_argument(
     type=str,
     help="path to directory containing train, dev and test jsons",
 )
+parser.add_argument(
+    "-e",
+    "--eval_dir",
+    type=str,
+    help="path to directory subset to evaluate",
+)
+
 parser.add_argument(
     "-m",
     "--mode",
@@ -78,7 +86,6 @@ class ClassificationDataset(Dataset):
             self.target_indices,
         ) = classification_lib.get_text_and_labels(data_dir, get_labels=True)
         target_set = set(self.target_indices)
-        print(target_set)
         assert list(sorted(target_set)) == list(range(len(target_set)))
         eye = np.eye(len(target_set), dtype=np.float64) # An identity matrix to easily switch to and from one-hot encoding.
         self.targets = [eye[int(i)] for i in self.target_indices]
@@ -194,7 +201,7 @@ def train_or_eval(
         return correct_predictions.double().item() / n_examples, np.mean(losses)
 
 
-def do_train(tokenizer, model, data_dir):
+def do_train(tokenizer, model, data_dir, ckpt_dir):
     """Train on train set, validating on dev set."""
 
     # We don't mess around with hyperparameters too much, just use decent ones.
@@ -253,33 +260,32 @@ def do_train(tokenizer, model, data_dir):
 
         # Save the model parameters if this is the best model seen so far
         if dev_acc > best_accuracy:
-            torch.save(model.state_dict(), f"ckpt/best_bert_model.bin")
+            torch.save(model.state_dict(), f"{ckpt_dir}/best_bert_model.bin")
             best_accuracy = dev_acc
             best_accuracy_epoch = epoch
 
-    with open(f"ckpt/history.pkl", "wb") as f:
+    with open(f"{ckpt_dir}/history.pkl", "wb") as f:
         pickle.dump(history, f)
 
 
-def do_eval(tokenizer, model, data_dir):
+def do_eval(tokenizer, model, data_dir, ckpt_dir):
     """Evaluate (on dev set?) without backpropagating."""
-    assert "dev" in data_dir
     test_data_loader = create_data_loader(
         data_dir,
         tokenizer,
     )
 
     # Get best model
-    model.load_state_dict(torch.load(f"ckpt/best_bert_model.bin"))
+    model.load_state_dict(torch.load(f"{ckpt_dir}/best_bert_model.bin"))
 
     dev_acc, dev_loss = train_or_eval(EVAL, model, test_data_loader, DEVICE)
 
     print("Dev accuracy", dev_acc)
 
 
-def do_predict(tokenizer, model, data_dir):
+def do_predict(tokenizer, model, data_dir, ckpt_dir):
 
-    model.load_state_dict(torch.load(f"ckpt/best_bert_model.bin"))
+    model.load_state_dict(torch.load(f"{ckpt_dir}/best_bert_model.bin"))
 
     predictions = {}
     with open(f"{data_dir}/features.jsonl", "r") as f:
@@ -305,6 +311,14 @@ def do_predict(tokenizer, model, data_dir):
                 + "\n"
             )
 
+def get_label_list(data_dir, task):
+    with open(f'{data_dir}/metadata.json', 'r') as f:
+        return json.load(f)['labels']
+
+def make_checkpoint_path(data_dir, task):
+    ckpt_dir = f"{data_dir}/{task}/ckpt"
+    os.makedirs(ckpt_dir, exist_ok=True)
+    return ckpt_dir
 
 def main():
 
@@ -312,16 +326,19 @@ def main():
     assert args.mode in [TRAIN, EVAL, PREDICT]
 
     tokenizer = BertTokenizer.from_pretrained(PRE_TRAINED_MODEL_NAME)
-    #model = Classifier(2).to(DEVICE)
-    model = Classifier(7).to(DEVICE)
+
+    labels = get_label_list(args.data_dir, args.task)
+    model = Classifier(len(labels)).to(DEVICE)
     model.loss_fn.to(DEVICE)
 
+    ckpt_dir = make_checkpoint_path(args.data_dir, args.task)
+
     if args.mode == TRAIN:
-        do_train(tokenizer, model, args.data_dir)
+        do_train(tokenizer, model, args.data_dir, ckpt_dir)
     elif args.mode == EVAL:
-        do_eval(tokenizer, model, args.data_dir)
+        do_eval(tokenizer, model, args.eval_dir, ckpt_dir)
     elif args.mode == PREDICT:
-        do_predict(tokenizer, model, args.data_dir)
+        do_predict(tokenizer, model, args.eval_dir, ckpt_dir)
 
 
 if __name__ == "__main__":

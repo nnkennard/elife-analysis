@@ -61,9 +61,10 @@ def main():
                 )
 
     task_output_dir = f"{args.output_dir}/{args.task}/"
+    os.makedirs(task_output_dir, exist_ok=True)
     label_map = list(sorted(set(t[2] for t in sum(sentences.values(), []))))
     with open(f"{task_output_dir}/metadata.json", "w") as f:
-        json.dump({"label_map": label_map}, f)
+        json.dump({"labels": label_map}, f)
 
     for subset, subset_sentences in sentences.items():
         subset_output_dir = f"{task_output_dir}/{subset}/"
