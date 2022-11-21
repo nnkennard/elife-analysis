@@ -1,5 +1,6 @@
 import argparse
 import collections
+import json
 import pickle
 import torch
 import torch.nn as nn
@@ -25,22 +26,20 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "-e",
-    "--eval_subset",
-    type=str,
-    choices="train dev test".split(),
-    help="subset to evaluate",
-)
-
-
-parser.add_argument(
     "-t",
     "--task",
     type=str,
     help="train eval or predict",
 )
 
-def do_predict(tokenizer, model, task_dir, input_file):
+parser.add_argument(
+    "-i",
+    "--input_file",
+    type=str,
+    help="preprocessed eLife file",
+)
+
+def do_predict(tokenizer, model, task_dir, input_file, labels):
 
   model.load_state_dict(torch.load(f"ckpt/best_bert_model.bin"))
 
@@ -49,12 +48,12 @@ def do_predict(tokenizer, model, task_dir, input_file):
     with open(input_file.replace(".jsonl", "_predictions.jsonl"), 'w') as g:
         for line in f:
           example = json.loads(line)
-          encoded_review = tokenizer_fn(tokenizer, example["text"])
+          encoded_review = classification_lib.tokenizer_fn(tokenizer, example["text"])
           input_ids = encoded_review["input_ids"].to(DEVICE)
           attention_mask = encoded_review["attention_mask"].to(DEVICE)
           output = model(input_ids, attention_mask)
           _, prediction = torch.max(output, dim=1)
-          example['prediction'] = prediction.item()
+          example['prediction'] = labels[prediction.item()]
           g.write(json.dumps(example) + "\n")
 
 
@@ -69,7 +68,7 @@ def main():
 
     task_dir = classification_lib.make_checkpoint_path(args.data_dir, args.task)
 
-    do_predict(tokenizer, model, task_dir, args.eval_subset)
+    do_predict(tokenizer, model, task_dir, args.input_file, labels)
 
 
 

@@ -65,8 +65,6 @@ def get_json_obj(filename):
     return json.load(f)
 
 
-def make_identifier(review_id, index):
-  return f"{review_id}|||{index}"
 
 
 def split_identifier(identifier):
