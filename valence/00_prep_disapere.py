@@ -4,8 +4,7 @@ import glob
 import json
 import os
 
-import preprocess_lib
-
+import classification_lib
 
 def polarity_exists(sentence):
     return 0 if sentence["polarity"] == "none" else 1
@@ -48,10 +47,11 @@ def main():
     sentences = collections.defaultdict(list)
     for subset in "train dev test".split():
         for filename in glob.glob(f"{args.data_dir}/final_dataset/{subset}/*.json"):
-            obj = preprocess_lib.get_json_obj(filename)
+            with open(filename, 'r') as f:
+                obj = json.load(f)
             review_id = obj["metadata"]["review_id"]
             for i, sentence in enumerate(obj["review_sentences"]):
-                identifier = preprocess_lib.make_identifier(review_id, i)
+                identifier = classification_lib.make_identifier(review_id, i)
                 sentences[subset].append(
                     (
                         identifier,

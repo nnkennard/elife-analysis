@@ -27,6 +27,9 @@ tokenizer_fn = lambda tok, text: tok.encode_plus(
     return_tensors="pt",
 )
 
+def make_identifier(review_id, index):
+    return f"{review_id}|||{index}"
+
 
 def get_text_and_labels(task_dir, subset, get_labels=False):
 

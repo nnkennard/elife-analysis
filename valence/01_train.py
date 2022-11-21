@@ -90,8 +90,8 @@ def do_train(tokenizer, model, task_dir):
       best_accuracy = val_acc
       best_accuracy_epoch = epoch
 
-  with open(f"{task_dir}/ckpt/history.pkl", "wb") as f:
-    pickle.dump(history, f)
+    with open(f"{task_dir}/ckpt/history.pkl", "wb") as f:
+      pickle.dump(history, f)
 
 
 def main():

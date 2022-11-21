@@ -41,7 +41,7 @@ parser.add_argument(
 
 def do_predict(tokenizer, model, task_dir, input_file, labels):
 
-  model.load_state_dict(torch.load(f"ckpt/best_bert_model.bin"))
+  model.load_state_dict(torch.load(f"{task_dir}/ckpt/best_bert_model.bin"))
 
   predictions = {}
   with open(input_file, "r") as f:
