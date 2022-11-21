@@ -16,7 +16,8 @@ from transformers import BertTokenizer, BertModel
 
 import classification_lib
 
-TRAIN, EVAL, PREDICT = "train eval predict".split()
+TRAIN, EVAL, PREDICT, DEV, TEST = "train eval predict dev test".split()
+
 
 parser = argparse.ArgumentParser(
     description="Train BERT model for DISAPERE classification tasks"
@@ -29,7 +30,8 @@ parser.add_argument(
 )
 parser.add_argument(
     "-e",
-    "--eval_dir",
+    "--eval_set",
+    choices=(TRAIN, DEV, TEST),
     type=str,
     help="path to directory subset to evaluate",
 )
@@ -62,7 +64,6 @@ HistoryItem = collections.namedtuple(
 
 Example = collections.namedtuple("Example", "identifier text target".split())
 
-
 # Wrapper around the tokenizer specifying the details of the BERT input
 # encoding.
 tokenizer_fn = lambda tok, text: tok.encode_plus(
@@ -79,6 +80,7 @@ tokenizer_fn = lambda tok, text: tok.encode_plus(
 
 class ClassificationDataset(Dataset):
     """A torch.utils.data.Dataset for binary classification."""
+
     def __init__(self, data_dir, tokenizer, max_len=512):
         (
             self.identifiers,
@@ -87,7 +89,9 @@ class ClassificationDataset(Dataset):
         ) = classification_lib.get_text_and_labels(data_dir, get_labels=True)
         target_set = set(self.target_indices)
         assert list(sorted(target_set)) == list(range(len(target_set)))
-        eye = np.eye(len(target_set), dtype=np.float64) # An identity matrix to easily switch to and from one-hot encoding.
+        eye = np.eye(
+            len(target_set), dtype=np.float64
+        )  # An identity matrix to easily switch to and from one-hot encoding.
         self.targets = [eye[int(i)] for i in self.target_indices]
         self.tokenizer = tokenizer
         self.max_len = max_len
@@ -118,17 +122,23 @@ class Classifier(nn.Module):
         self.drop = nn.Dropout(p=0.3)
         self.out = nn.Linear(self.bert.config.hidden_size, num_classes)
         if num_classes == 2:
-            self.loss_fn = nn.BCEWithLogitsLoss() # Not sure if this is reasonable
+            self.loss_fn = nn.BCEWithLogitsLoss()  # Not sure if this is reasonable
         else:
             self.loss_fn = nn.CrossEntropyLoss()
 
-    def forward(self, input_ids, attention_mask):
+    def forward(self, input_ids, attention_mask):  # This function is required
         bert_output = self.bert(input_ids=input_ids, attention_mask=attention_mask)
         output = self.drop(bert_output["pooler_output"])
         return self.out(output)
 
 
 def create_data_loader(data_dir, tokenizer):
+    """Wrap a DataLoader around a PolarityDetectionDataset.
+
+    While the dataset manages the content of the data, the data loader is more
+    concerned with how the data is doled out, and is the connection between the
+    dataset and the model.
+    """
     ds = ClassificationDataset(
         data_dir,
         tokenizer=tokenizer,
@@ -137,13 +147,17 @@ def create_data_loader(data_dir, tokenizer):
 
 
 def build_data_loaders(data_dir, tokenizer):
+    """Build train and dev data loaders from a structured data directory.
+
+    TODO(nnk): Investigate why there is no test data loader.
+    """
     return (
         create_data_loader(
-            f'{data_dir}/train/',
+            f"{data_dir}/train/",
             tokenizer,
         ),
         create_data_loader(
-            f'{data_dir}/dev/',
+            f"{data_dir}/dev/",
             tokenizer,
         ),
     )
@@ -158,6 +172,7 @@ def train_or_eval(
     optimizer=None,
     scheduler=None,
 ):
+    """Do a forward pass of the model, backpropagating only for TRAIN passes."""
     assert mode in [TRAIN, EVAL]
     is_train = mode == TRAIN
     if is_train:
@@ -204,6 +219,8 @@ def train_or_eval(
 def do_train(tokenizer, model, data_dir, ckpt_dir):
     """Train on train set, validating on dev set."""
 
+    print("data dir", data_dir, "ckpt_dir", ckpt_dir)
+
     # We don't mess around with hyperparameters too much, just use decent ones.
     hyperparams = {
         "epochs": EPOCHS,
@@ -225,47 +242,63 @@ def do_train(tokenizer, model, data_dir, ckpt_dir):
         optimizer, num_warmup_steps=0, num_training_steps=total_steps
     )
 
-    history = []
-    best_accuracy = 0
-    best_accuracy_epoch = None
+    print("Something is very wrong...")
 
-    # EPOCHS is the maximum number of epochs we will run.
-    for epoch in range(EPOCHS):
+    assert mode in [TRAIN, EVAL]
+    is_train = mode == TRAIN
+    if is_train:
+        model = model.train()  # Put the model in train mode
+        context = nullcontext()
+        # ^ This is so that we can reuse code between this mode and eval mode, when
+        # we do have to specify a context
+        assert optimizer is not None  # Required for backprop
+        assert scheduler is not None  # Required for backprop
+    else:
+        model = model.eval()  # Put the model in eval mode
+        context = torch.no_grad()  # Don't backpropagate
 
-        # If no improvement is seen in PATIENCE iterations, we quit.
-        if best_accuracy_epoch is not None and epoch - best_accuracy_epoch > PATIENCE:
-            break
+    results = []
+    losses = []
+    correct_predictions = 0
+    n_examples = len(data_loader.dataset)
 
-        print(f"Epoch {epoch + 1}/{EPOCHS}")
-        print("-" * 10)
+    with context:
+        for d in tqdm.tqdm(data_loader):  # Load batchwise
+            input_ids, attention_mask, targets, target_indices = [
+                d[k].to(device)  # Move all this stuff to gpu
+                for k in "input_ids attention_mask targets target_indices".split()
+            ]
 
-        # Run train_or_eval ono train set in TRAIN mode, backpropagating
-        train_acc, train_loss = train_or_eval(
-            TRAIN,
-            model,
-            train_data_loader,
-            DEVICE,
-            optimizer=optimizer,
-            scheduler=scheduler,
-        )
+            outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+            # ^ this gives logits
+            _, preds = torch.max(outputs, dim=1)
+            # TODO(nnk): make this argmax!
+            if return_preds:
+                # If this is being run as part of prediction, we need to return the
+                # predicted indices. If we are just evaluating, we just need loss and/or
+                # accuracy
+                results.append((d["identifier"], preds.cpu().numpy().tolist()))
 
-        # Run train_or_eval on dev set in EVAL mode
-        dev_acc, dev_loss = train_or_eval(EVAL, model, dev_data_loader, DEVICE)
+            # We need loss for both train and eval
+            loss = loss_fn(outputs, targets)
+            losses.append(loss.item())
 
-        # Recording metadata
-        history.append(HistoryItem(epoch, train_acc, train_loss, dev_acc, dev_loss))
-        for k, v in history[-1]._asdict().items():
-            print(k + "\t", v)
-        print()
+            # Counting correct predictions in order to calculate accuracy later
+            correct_predictions += torch.sum(preds == target_indices)
 
-        # Save the model parameters if this is the best model seen so far
-        if dev_acc > best_accuracy:
-            torch.save(model.state_dict(), f"{ckpt_dir}/best_bert_model.bin")
-            best_accuracy = dev_acc
-            best_accuracy_epoch = epoch
+            if is_train:
+                # Backpropagation steps
+                loss.backward()
+                nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+                optimizer.step()
+                scheduler.step()
+                optimizer.zero_grad()
 
-    with open(f"{ckpt_dir}/history.pkl", "wb") as f:
-        pickle.dump(history, f)
+    if return_preds:
+        return results
+    else:
+        # Return accuracy and mean loss
+        return correct_predictions.double().item() / n_examples, np.mean(losses)
 
 
 def do_eval(tokenizer, model, data_dir, ckpt_dir):
@@ -279,7 +312,6 @@ def do_eval(tokenizer, model, data_dir, ckpt_dir):
     model.load_state_dict(torch.load(f"{ckpt_dir}/best_bert_model.bin"))
 
     dev_acc, dev_loss = train_or_eval(EVAL, model, test_data_loader, DEVICE)
-
     print("Dev accuracy", dev_acc)
 
 
@@ -311,14 +343,18 @@ def do_predict(tokenizer, model, data_dir, ckpt_dir):
                 + "\n"
             )
 
+
 def get_label_list(data_dir, task):
-    with open(f'{data_dir}/metadata.json', 'r') as f:
-        return json.load(f)['labels']
+    with open(f"{data_dir}/{task}/metadata.json", "r") as f:
+        return json.load(f)["labels"]
+
 
 def make_checkpoint_path(data_dir, task):
+    print(data_dir)
     ckpt_dir = f"{data_dir}/{task}/ckpt"
     os.makedirs(ckpt_dir, exist_ok=True)
     return ckpt_dir
+
 
 def main():
 
@@ -334,11 +370,11 @@ def main():
     ckpt_dir = make_checkpoint_path(args.data_dir, args.task)
 
     if args.mode == TRAIN:
-        do_train(tokenizer, model, args.data_dir, ckpt_dir)
+        do_train(tokenizer, model, f'{args.data_dir}/{args.task}/', ckpt_dir)
     elif args.mode == EVAL:
-        do_eval(tokenizer, model, args.eval_dir, ckpt_dir)
+        do_eval(tokenizer, model, args.data_dir, args.eval_set, ckpt_dir)
     elif args.mode == PREDICT:
-        do_predict(tokenizer, model, args.eval_dir, ckpt_dir)
+        do_predict(tokenizer, model, args.predict_input, ckpt_dir)
 
 
 if __name__ == "__main__":

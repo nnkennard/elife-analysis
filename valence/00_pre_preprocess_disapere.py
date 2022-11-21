@@ -67,20 +67,16 @@ def main():
         json.dump({"labels": label_map}, f)
 
     for subset, subset_sentences in sentences.items():
-        subset_output_dir = f"{task_output_dir}/{subset}/"
-        os.makedirs(subset_output_dir, exist_ok=True)
-        with open(f"{subset_output_dir}/labels.jsonl", "w") as f_l:
-            with open(f"{subset_output_dir}/sentences.jsonl", "w") as f_s:
-                for identifier, text, label in subset_sentences:
-                    f_l.write(
-                        json.dumps(
-                            {"identifier": identifier, "label": label_map.index(label)}
-                        )
-                        + "\n"
+        with open(f'{task_output_dir}/{subset}.jsonl', 'w') as f:
+            for identifier, text, label in subset_sentences:
+                f.write(
+                    json.dumps(
+                        {"identifier": identifier,
+                        "text":text,
+                        "label": label_map.index(label)}
                     )
-                    f_s.write(
-                        json.dumps({"identifier": identifier, "text": text}) + "\n"
-                    )
+                    + "\n"
+                )
 
 
 if __name__ == "__main__":
