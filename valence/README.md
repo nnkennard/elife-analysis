@@ -30,7 +30,7 @@ Example command:
 ```
 python 01_train.py -d disapere_data/ -t review_action
 ```
-This will train a model on the train set (`disapere_data/train/*`) and evaluate it on the dev set. The best checkpoint is saved within the same directory as the data, along with a history of the run. In our example:
+This will train a model on the train set and evaluate it on the dev set. The best checkpoint is saved within the same directory as the data, along with a history of the run. In our example:
 
 ```
 disapere_data/
