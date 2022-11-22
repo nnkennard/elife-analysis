@@ -8,7 +8,7 @@ The `00_prep_disapere.py` script operates by iterating over all sentences in the
 Example command:
 
 ```
-python 00_prep_disapere.py -i ../../DISAPERE/DISAPERE -d disapere_data -t review_action
+python 00_prep_disapere.py -d ../../DISAPERE/DISAPERE -o disapere_data -t review_action
 ```
 
 This script creates a subdirectory for the task in the data directory and files with sentences and their label indices for train/dev/test subsets. The metadata file contains a mapping from indices to label names, useful for making the prediction files human-readable later.
