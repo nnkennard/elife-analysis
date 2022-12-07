@@ -3,7 +3,7 @@ import glob
 import json
 import os
 import stanza
-import tqdm
+from tqdm import tqdm
 
 import classification_lib
 
@@ -46,7 +46,7 @@ def main():
     args = parser.parse_args()
 
     with open(args.processed_data_file, "w") as f:
-        for filename in glob.glob(f"{args.raw_data_dir}/*.json"):
+        for filename in tqdm(glob.glob(f"{args.raw_data_dir}/*.json")):
             for sentence in get_sentences_from_file(filename):
                 f.write(json.dumps(sentence) + "\n")
 

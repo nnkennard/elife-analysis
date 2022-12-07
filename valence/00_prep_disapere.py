@@ -12,11 +12,16 @@ def polarity_exists(sentence):
 
 def review_action(sentence):
     return sentence["review_action"]
+  
+    
+def ms_aspect(sentence):
+    return sentence["aspect"]
 
 
 TASK_MAP = {
     "polarity_exists": polarity_exists,
     "review_action": review_action,
+    "ms_aspect": ms_aspect
 }
 
 parser = argparse.ArgumentParser(description="Extract DISAPERE data")

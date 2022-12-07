@@ -5,7 +5,7 @@ import pickle
 import torch
 import torch.nn as nn
 import transformers
-
+from tqdm import tqdm
 from contextlib import nullcontext
 from torch.optim import AdamW
 from transformers import BertTokenizer 
@@ -29,7 +29,7 @@ parser.add_argument(
     "-t",
     "--task",
     type=str,
-    help="train eval or predict",
+    help="review_action or ms_aspect",
 )
 
 parser.add_argument(
@@ -39,14 +39,17 @@ parser.add_argument(
     help="preprocessed eLife file",
 )
 
-def do_predict(tokenizer, model, task_dir, input_file, labels):
+
+def do_predict(tokenizer, model, task_dir, input_file, task, labels):
 
   model.load_state_dict(torch.load(f"{task_dir}/ckpt/best_bert_model.bin"))
 
   predictions = {}
+  
+            
   with open(input_file, "r") as f:
-    with open(input_file.replace(".jsonl", "_predictions.jsonl"), 'w') as g:
-        for line in f:
+    with open(input_file.replace(".jsonl", f"_{task}_predictions.jsonl"), 'w') as g:
+        for line in tqdm(f):
           example = json.loads(line)
           encoded_review = classification_lib.tokenizer_fn(tokenizer, example["text"])
           input_ids = encoded_review["input_ids"].to(DEVICE)
@@ -68,7 +71,7 @@ def main():
 
     task_dir = classification_lib.make_checkpoint_path(args.data_dir, args.task)
 
-    do_predict(tokenizer, model, task_dir, args.input_file, labels)
+    do_predict(tokenizer, model, task_dir, args.input_file, args.task, labels)
 
 
 
