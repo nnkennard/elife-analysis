@@ -77,7 +77,7 @@ This produces the file `preprocessed_elife_mini_predictions.jsonl`.
 
 ## Label eLife
 
-This script generates a hand-labeled eLife dataset with `-n_reviews` labeled through an interactive command line prompt. It summons the reviews from BQ, tokenizes their sentences, prints each sentence, and asks the user to label the various aspects or arguments present in the sentence. It finally writes `{lastname}_disapere_elife_labels.csv` here `/home/jupyter/00_daniel/00_reviews/00_data/`.
+This script generates a hand-labeled eLife dataset with `-n_reviews` labeled through an interactive command line prompt. It summons the reviews from BQ, tokenizes their sentences, prints each sentence, and then asks the user to label the various aspects or arguments present in the sentence. It finally writes (all at once, not line by line) `{lastname}_disapere_elife_labels.csv` here `/home/jupyter/00_daniel/00_reviews/00_data/`.
 
 Example command:
 ```
@@ -87,6 +87,6 @@ python 05_label_elife.py -n 2
 python 05_label_elife.py -n_reviews 2 
 ```
 Caution!
-- If you select "True"  when prompted if it's your first time labeling, and you have in fact already labeled sentences, you will lose past work.
+- If you select "True"  when prompted, "This is your first time (True/False):", and it is not your first time and you have in fact already labeled sentences, __you will lose all past work__.
 - If you make a typo, the script will either break or write the type to the file. In the case of the former, all data from that session will be lost. In case of the latter, you'll have to edit the file above by hand or start over.
 - There's an annoying BQ/pyarrow error. This can be ignored for now.
