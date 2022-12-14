@@ -81,9 +81,11 @@ This script generates a hand-labeled eLife dataset with `-n_reviews` labeled thr
 
 Example command:
 ```
+conda activate elife-sim
 python 05_label_elife.py -n 2
 ```
 ```
+conda activate elife-sim
 python 05_label_elife.py -n_reviews 2 
 ```
 Caution!
