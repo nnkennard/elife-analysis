@@ -24,17 +24,16 @@ parser.add_argument(
 SENTENCIZE_PIPELINE = stanza.Pipeline("en", processors="tokenize")
 
 
-
 def get_sentences_from_file(filename):
     sentences = []
     with open(filename, "r") as f:
         obj = json.load(f)
-        for i, sentence in enumerate(
-            SENTENCIZE_PIPELINE(obj["text"]).sentences
-        ):
+        for i, sentence in enumerate(SENTENCIZE_PIPELINE(obj["text"]).sentences):
             sentences.append(
                 {
-                    "identifier": classification_lib.make_identifier(obj["identifier"], i),
+                    "identifier": classification_lib.make_identifier(
+                        obj["identifier"], i
+                    ),
                     "text": sentence.text,
                 }
             )

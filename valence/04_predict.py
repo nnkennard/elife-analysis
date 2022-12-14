@@ -8,7 +8,7 @@ import transformers
 from tqdm import tqdm
 from contextlib import nullcontext
 from torch.optim import AdamW
-from transformers import BertTokenizer 
+from transformers import BertTokenizer
 
 import classification_lib
 
@@ -42,27 +42,28 @@ parser.add_argument(
 
 def do_predict(tokenizer, model, task_dir, input_file, task, labels):
 
-  model.load_state_dict(torch.load(f"{task_dir}/ckpt/best_bert_model.bin"))
+    model.load_state_dict(torch.load(f"{task_dir}/ckpt/best_bert_model.bin"))
 
-  predictions = {}
-  
-            
-  with open(input_file, "r") as f:
-    with open(input_file.replace(".jsonl", f"_{task}_predictions.jsonl"), 'w') as g:
-        for line in tqdm(f):
-          example = json.loads(line)
-          encoded_review = classification_lib.tokenizer_fn(tokenizer, example["text"])
-          input_ids = encoded_review["input_ids"].to(DEVICE)
-          attention_mask = encoded_review["attention_mask"].to(DEVICE)
-          output = model(input_ids, attention_mask)
-          _, prediction = torch.max(output, dim=1)
-          example['prediction'] = labels[prediction.item()]
-          g.write(json.dumps(example) + "\n")
+    predictions = {}
+
+    with open(input_file, "r") as f:
+        with open(input_file.replace(".jsonl", f"_{task}_predictions.jsonl"), "w") as g:
+            for line in tqdm(f):
+                example = json.loads(line)
+                encoded_review = classification_lib.tokenizer_fn(
+                    tokenizer, example["text"]
+                )
+                input_ids = encoded_review["input_ids"].to(DEVICE)
+                attention_mask = encoded_review["attention_mask"].to(DEVICE)
+                output = model(input_ids, attention_mask)
+                _, prediction = torch.max(output, dim=1)
+                example["prediction"] = labels[prediction.item()]
+                g.write(json.dumps(example) + "\n")
 
 
 def main():
     args = parser.parse_args()
-    
+
     tokenizer = BertTokenizer.from_pretrained(classification_lib.PRE_TRAINED_MODEL_NAME)
 
     labels = classification_lib.get_label_list(args.data_dir, args.task)
@@ -72,7 +73,6 @@ def main():
     task_dir = classification_lib.make_checkpoint_path(args.data_dir, args.task)
 
     do_predict(tokenizer, model, task_dir, args.input_file, args.task, labels)
-
 
 
 if __name__ == "__main__":

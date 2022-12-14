@@ -6,14 +6,15 @@ import os
 
 import classification_lib
 
+
 def polarity_exists(sentence):
     return 0 if sentence["polarity"] == "none" else 1
 
 
 def review_action(sentence):
     return sentence["review_action"]
-  
-    
+
+
 def ms_aspect(sentence):
     return sentence["aspect"]
 
@@ -21,7 +22,7 @@ def ms_aspect(sentence):
 TASK_MAP = {
     "polarity_exists": polarity_exists,
     "review_action": review_action,
-    "ms_aspect": ms_aspect
+    "ms_aspect": ms_aspect,
 }
 
 parser = argparse.ArgumentParser(description="Extract DISAPERE data")
@@ -52,7 +53,7 @@ def main():
     sentences = collections.defaultdict(list)
     for subset in "train dev test".split():
         for filename in glob.glob(f"{args.data_dir}/final_dataset/{subset}/*.json"):
-            with open(filename, 'r') as f:
+            with open(filename, "r") as f:
                 obj = json.load(f)
             review_id = obj["metadata"]["review_id"]
             for i, sentence in enumerate(obj["review_sentences"]):
@@ -72,13 +73,15 @@ def main():
         json.dump({"labels": label_map}, f)
 
     for subset, subset_sentences in sentences.items():
-        with open(f'{task_output_dir}/{subset}.jsonl', 'w') as f:
+        with open(f"{task_output_dir}/{subset}.jsonl", "w") as f:
             for identifier, text, label in subset_sentences:
                 f.write(
                     json.dumps(
-                        {"identifier": identifier,
-                        "text":text,
-                        "label": label_map.index(label)}
+                        {
+                            "identifier": identifier,
+                            "text": text,
+                            "label": label_map.index(label),
+                        }
                     )
                     + "\n"
                 )
