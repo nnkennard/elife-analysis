@@ -7,7 +7,7 @@ import transformers
 
 from contextlib import nullcontext
 from torch.optim import AdamW
-from transformers import BertTokenizer 
+from transformers import BertTokenizer
 
 import classification_lib
 
@@ -40,25 +40,27 @@ parser.add_argument(
     help="train eval or predict",
 )
 
+
 def do_eval(tokenizer, model, task_dir, eval_subset):
-  """Evaluate (on dev set?) without backpropagating."""
-  data_loader = classification_lib.create_data_loader(
-          task_dir,
-          eval_subset,
-      tokenizer,
-  )
+    """Evaluate (on dev set?) without backpropagating."""
+    data_loader = classification_lib.create_data_loader(
+        task_dir,
+        eval_subset,
+        tokenizer,
+    )
 
-  # Get best model
-  model.load_state_dict(torch.load(f"{task_dir}/ckpt/best_bert_model.bin"))
-  acc, loss = classification_lib.train_or_eval(classification_lib.EVAL, model, data_loader, DEVICE)
+    # Get best model
+    model.load_state_dict(torch.load(f"{task_dir}/ckpt/best_bert_model.bin"))
+    acc, loss = classification_lib.train_or_eval(
+        classification_lib.EVAL, model, data_loader, DEVICE
+    )
 
-  print(f'Accuracy: {acc} Loss: {loss}')
-
+    print(f"Accuracy: {acc} Loss: {loss}")
 
 
 def main():
     args = parser.parse_args()
-    
+
     tokenizer = BertTokenizer.from_pretrained(classification_lib.PRE_TRAINED_MODEL_NAME)
 
     labels = classification_lib.get_label_list(args.data_dir, args.task)
@@ -68,7 +70,6 @@ def main():
     task_dir = classification_lib.make_checkpoint_path(args.data_dir, args.task)
 
     do_eval(tokenizer, model, task_dir, args.eval_subset)
-
 
 
 if __name__ == "__main__":
