@@ -48,11 +48,6 @@ ASPS = [
 PATH = "/home/jupyter/00_daniel/00_reviews/00_data/"
 
 
-def main(): 
-    for i, sentence in enumerate(SENTENCIZE_PIPELINE("Daniel is trying. Really hard!").sentences):
-        print(sentence.text)
-    
-
 def GetInfo():
     """
     Requests conder info to use in writing/appending 
