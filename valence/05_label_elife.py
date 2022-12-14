@@ -119,9 +119,7 @@ def label_sentences(sentence_df, n_to_rate):
             # Print Sentence and its identifiers
             print()
             print("-" * 100)
-            print(
-                f"SENTENCE {n_sentences} OF {n_to_rate} SENTENCES TO RATE"
-            )
+            print(f"SENTENCE {n_sentences} OF {n_to_rate} SENTENCES TO RATE")
             print(f"M_ID: {mid}\tR_ID: {rid}\tS_ID: {sid}")
             print("-" * 50)
             pp.pprint(f"{sentence_dct['text']}")
@@ -160,17 +158,16 @@ def label_sentences(sentence_df, n_to_rate):
                     for asp in ASPS:
                         key = f"asp_{asp.lower()}"
                         value = input(f"\t\t{asp}: ")
-                        sentence_dct[key] = int(value)                    
+                        sentence_dct[key] = int(value)
                     key = "asp_other"
                     val = input("\t\tOther aspect (0 or write in): ")
-                    
-                    
-                elif sentence_dct['arg_structuring'] == 1: 
+
+                elif sentence_dct["arg_structuring"] == 1:
                     print("\n\tSelect the kind of structuring of this sentence:")
                     for struc in "Summary Heading Quote".split():
                         key = f"req_{struc.lower()}"
                         value = input(f"\t\t{struc}: ")
-                        sentence_dct[key] = int(value) 
+                        sentence_dct[key] = int(value)
 
                 else:
                     # Null vals for asps when arg is non-eval
