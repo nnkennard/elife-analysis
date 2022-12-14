@@ -103,14 +103,104 @@ def get_sentences_df(df):
     return pd.DataFrame.from_dict(sentence_dicts)
 
 
-def main(n_reviews):
+def label_sentences(sentence_df, n_to_rate):
+    n_reviews = 0
+    for review_id, review_df in sentence_df.groupby("review_id"):
+        n_reviews += 1
+        n_sentences = 0
+        sentence_dicts = []
+        for _, sentence_dct in review_df.iterrows():
+            n_sentences += 1
+            # Get identifying info
+            mid = sentence_dct["manuscript_no"]
+            rid = sentence_dct["review_id"]
+            sid = sentence_dct["identifier"]
 
-    # Get data
-    print("Getting data from BQ...")
-    df = summon_reviews(n_reviews)
-    sentence_df = get_sentences_df(df)
+            # Print Sentence and its identifiers
+            print()
+            print("-" * 100)
+            print(
+                f"SENTENCE {n_sentences} OF {n_to_rate} SENTENCES TO RATE"
+            )
+            print(f"M_ID: {mid}\tR_ID: {rid}\tS_ID: {sid}")
+            print("-" * 50)
+            pp.pprint(f"{sentence_dct['text']}")
+            print("-" * 100)
 
-    # Get user info
+            # Ask if evaluative
+            evaluative = input(
+                "\tThis sentence subjectively evaluates the manuscript (0=no, 1=yes): "
+            )
+            sentence_dct["arg_evaluative"] = int(evaluative)
+
+            if sentence_dct["arg_evaluative"] == 0:
+
+                # Get arg when non-eval
+                print("\n\tSelect the non-evaluative action of this sentence:")
+                for arg in ARGS:
+                    key = f"arg_{arg.lower()}"
+                    value = input(f"\t\t{arg}: ")
+                    sentence_dct[key] = int(value)
+                key = "arg_other"
+                val = input("\t\tOther argument (0 or write in): ")
+
+                if sentence_dct["arg_request"] == 1:
+
+                    # Get fine grained req
+                    print("\n\tSelect what this sentence requests:")
+                    for req in "Experiment Edit Typo".split():
+                        key = f"req_{req.lower()}"
+                        value = input(f"\t\t{req}: ")
+                        sentence_dct[key] = int(value)
+
+                    # Get aspect when req
+                    print(
+                        "\n\tSelect the aspect of the manuscript that is the subject of this sentence's request:"
+                    )
+                    for asp in ASPS:
+                        key = f"asp_{asp.lower()}"
+                        value = input(f"\t\t{asp}: ")
+                        sentence_dct[key] = int(value)                    
+                    key = "asp_other"
+                    val = input("\t\tOther aspect (0 or write in): ")
+                    
+                    
+                elif sentence_dct['arg_structuring'] == 1: 
+                    print("\n\tSelect the kind of structuring of this sentence:")
+                    for struc in "Summary Heading Quote".split():
+                        key = f"req_{struc.lower()}"
+                        value = input(f"\t\t{struc}: ")
+                        sentence_dct[key] = int(value) 
+
+                else:
+                    # Null vals for asps when arg is non-eval
+                    for asp in ASPS:
+                        key = f"asp_{asp.lower()}"
+                        sentence_dct[key] = 0
+
+            else:
+
+                # Null vals for other args when arg is eval
+                for arg in ARGS:
+                    key = f"arg_{arg.lower()}"
+                    sentence_dct[key] = 0
+
+                # Get aspect when eval
+                print(
+                    "\n\tSelect the aspect of the manuscript that this sentence evaluates:"
+                )
+                for asp in ASPS:
+                    key = f"asp_{asp.lower()}"
+                    value = input(f"\t\t{asp}: ")
+                    sentence_dct[key] = int(value)
+                key = "asp_other"
+                val = input("\t\tOther aspect (0 or write in): ")
+        sentence_dicts.append(sentence_dct)
+    sentences_df = pd.DataFrame.from_dict(sentence_dicts)
+    return sentences_df
+
+
+def start_up_message():
     print()
     print()
     print()
@@ -119,86 +209,25 @@ def main(n_reviews):
     print("START INTERACTIVE CODING SESSION!")
     print("-" * 33)
     print("*" * 33)
+
+
+def main(n_reviews):
+
+    # Get data
+    print("Getting data from BQ...")
+    df = summon_reviews(n_reviews)
+    sentences_df = get_sentences_df(df)
+
+    start_up_message()
+
+    # Get user info
     first_time, rater, n_to_rate = GetInfo()
     rater_file = "{}_disapere_elife_labels.csv".format(rater)
 
     # first time means new file
     if first_time == True:
-
-        sentence_df = sentence_df.iloc[:n_to_rate]
-        n_reviews = 0
-        for _, review_df in sentence_df.groupby("review_id"):
-            n_reviews += 1
-            n_sentences = 0
-
-            sentence_dicts = []
-            for _, sentence_dct in review_df.iterrows():
-                n_sentences += 1
-                mid = sentence_dct["manuscript_no"]
-                rid = sentence_dct["review_id"]
-                sid = sentence_dct["identifier"]
-                print()
-                print("-" * 100)
-                print(
-                    f"SENTENCE {n_sentences} OF {len(review_df)} SENTENCES IN REVIEW {n_reviews} of {n_to_rate} REVIEWS"
-                )
-                print(f"M_ID: {mid}\tR_ID: {rid}\tS_ID: {sid}")
-                print("-" * 50)
-                pp.pprint(f"{sentence_dct['text']}")
-                print("-" * 100)
-
-                evaluative = input(
-                    "\tThis sentence subjectively evaluates the manuscript (0=no, 1=yes): "
-                )
-                sentence_dct["arg_evaluative"] = int(evaluative)
-
-                if sentence_dct["arg_evaluative"] == 0:
-
-                    print("\n\tSelect the non-evaluative action of this sentence:")
-                    for arg in ARGS:
-                        key = f"arg_{arg.lower()}"
-                        value = input(f"\t\t{arg}: ")
-                        sentence_dct[key] = int(value)
-
-                    if sentence_dct["arg_request"] == 1:
-
-                        print("\n\tSelect what this sentence requests:")
-                        for req in "Experiment Edit Typo".split():
-                            key = f"req_{req.lower()}"
-                            value = input(f"\t\t{req}: ")
-                            sentence_dct[key] = int(value)
-
-                        print(
-                            "\n\tSelect the aspect of the manuscript that is the subject of this sentence's request:"
-                        )
-                        for asp in ASPS:
-                            key = f"asp_{asp.lower()}"
-                            value = input(f"\t\t{asp}: ")
-                            sentence_dct[key] = int(value)
-
-                    else:
-                        # Null vals for asps when arg is non-eval
-                        for asp in ASPS:
-                            key = f"asp_{asp.lower()}"
-                            sentence_dct[key] = 0
-
-                else:
-
-                    # Null vals for other args when arg is eval
-                    for arg in ARGS:
-                        key = f"arg_{arg.lower()}"
-                        sentence_dct[key] = 0
-
-                    print(
-                        "\n\tSelect the aspect of the manuscript that this sentence evaluates:"
-                    )
-                    for asp in ASPS:
-                        key = f"asp_{asp.lower()}"
-                        value = input(f"\t\t{asp}: ")
-                        sentence_dct[key] = int(value)
-                sentence_dicts.append(sentence_dct)
-
-        sentences_df = pd.DataFrame.from_dict(sentence_dicts)
+        sentences_df = sentences_df.iloc[:n_to_rate]
+        sentences_df = label_sentences(sentences_df, n_to_rate)
         sentences_df.to_csv(PATH + rater_file, header=True, mode="w", index=False)
 
     # nth time means append file, and make sure only unrated reviews are printed
@@ -207,84 +236,10 @@ def main(n_reviews):
         # open existing rated reviews file
         rater_df = pd.read_csv(PATH + rater_file)
         already_reviewed = list(rater_df["identifier"])
-
-        n_reviews = 0
-        sentence_df = sentence_df[~sentence_df["identifier"].isin(already_reviewed)][
-            :n_to_rate
-        ]
-        for review_id, review_df in sentence_df.groupby("review_id"):
-            n_reviews += 1
-            n_sentences = 0
-            sentence_dicts = []
-            for _, sentence_dct in review_df.iterrows():
-                n_sentences += 1
-                mid = sentence_dct["manuscript_no"]
-                rid = sentence_dct["review_id"]
-                sid = sentence_dct["identifier"]
-                print()
-                print("-" * 100)
-                print(
-                    f"SENTENCE {n_sentences} OF {len(review_df)} SENTENCES IN REVIEW {n_reviews} of {n_to_rate} REVIEWS"
-                )
-                print(f"M_ID: {mid}\tR_ID: {rid}\tS_ID: {sid}")
-                print("-" * 50)
-                pp.pprint(f"{sentence_dct['text']}")
-                print("-" * 100)
-
-                evaluative = input(
-                    "\tThis sentence subjectively evaluates the manuscript (0=no, 1=yes): "
-                )
-                sentence_dct["arg_evaluative"] = int(evaluative)
-
-                if sentence_dct["arg_evaluative"] == 0:
-
-                    print("\n\tSelect the non-evaluative action of this sentence:")
-                    for arg in ARGS:
-                        key = f"arg_{arg.lower()}"
-                        value = input(f"\t\t{arg}: ")
-                        sentence_dct[key] = int(value)
-
-                    if sentence_dct["arg_request"] == 1:
-
-                        print("\n\tSelect what this sentence requests:")
-                        for req in "Experiment Edit Typo".split():
-                            key = f"req_{req.lower()}"
-                            value = input(f"\t\t{req}: ")
-                            sentence_dct[key] = int(value)
-
-                        print(
-                            "\n\tSelect the aspect of the manuscript that is the subject of this sentence's request:"
-                        )
-                        for asp in ASPS:
-                            key = f"asp_{asp.lower()}"
-                            value = input(f"\t\t{asp}: ")
-                            sentence_dct[key] = int(value)
-
-                    else:
-                        # Null vals for asps when arg is non-eval
-                        for asp in ASPS:
-                            key = f"asp_{asp.lower()}"
-                            sentence_dct[key] = 0
-
-                else:
-
-                    # Null vals for other args when arg is eval
-                    for arg in ARGS:
-                        key = f"arg_{arg.lower()}"
-                        sentence_dct[key] = 0
-
-                print(
-                    "\n\tSelect the aspect of the manuscript that this sentence evaluates:"
-                )
-                for asp in ASPS:
-                    key = f"asp_{asp.lower()}"
-                    value = input(f"\t\t{asp}: ")
-                    sentence_dct[key] = int(value)
-
-                sentence_dicts.append(sentence_dct)
-
-            sentences_df = pd.DataFrame.from_dict(sentence_dicts)
-            sentences_df.to_csv(PATH + rater_file, header=False, mode="a", index=False)
+        sentences_df = sentences_df[~sentences_df["identifier"].isin(already_reviewed)]
+        sentences_df = sentences_df[:n_to_rate]
+        sentences_df = label_sentences(sentences_df, n_to_rate)
+        sentences_df.to_csv(PATH + rater_file, header=False, mode="a", index=False)
 
 
 if __name__ == "__main__":
