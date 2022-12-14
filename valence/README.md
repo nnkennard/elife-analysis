@@ -77,7 +77,7 @@ This produces the file `preprocessed_elife_mini_predictions.jsonl`.
 
 ## Label eLife
 
-This script generates a hand-labeled eLife dataset with `-n_reviews` labeled through an interactive command line prompt. It summons the reviews from BQ, tokenizes their sentences, prints each sentence, and asks the user to label the various aspects or arguments present in the sentence. It finally writes `{lastname}_disapere_elife_labels.csv` here 
+This script generates a hand-labeled eLife dataset with `-n_reviews` labeled through an interactive command line prompt. It summons the reviews from BQ, tokenizes their sentences, prints each sentence, and asks the user to label the various aspects or arguments present in the sentence. It finally writes `{lastname}_disapere_elife_labels.csv` here `/home/jupyter/00_daniel/00_reviews/00_data/`.
 
 Example command:
 ```
