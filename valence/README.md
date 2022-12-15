@@ -102,4 +102,5 @@ Notes of caution:
     - If the code does not break, the typo will be written to the file and you'll need to fix it by hand. Make a note of the identifier for easy re-labeling down the line.
 - A smaller int for the arg `ns` means more breaks. It also means the reviews will be summoned from BQ more often (more queries).
 - If you want to abort a current coding session mid-sentence, just put any non-int value into the prompt (the current sentence labels won't be written).
-- Once we're confident that the script works, we can first put `n_reviews` to 10 for inter-rater reliability. We each will get the same randomly drawn sample of 10 reviews and all their sentences to label. Then, when we're ready to do more, we can each specifiy 100 or so. __Important__: for the purposes of validating the script and 
+- __Important__: for the purposes of validating the script and computing inter-rater reliability, `n_reviews` must be identical when we label, else the random sample will be different for each of us.
+    - Once we're confident that the script works, we can first put `n_reviews` to 10 for inter-rater reliability. We each will get the same randomly drawn sample of 10 reviews and all their sentences to label. Then, when we're ready to do more, we can each specifiy 100 or so. 
