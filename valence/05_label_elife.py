@@ -67,19 +67,11 @@ ASPS = [
     "asp_OTHER",
 ]
 
-REQS = [
-    "req_EDIT",
-    "req_TYPO",
-    "req_EXPERIMENT"
-]
+REQS = ["req_EDIT", "req_TYPO", "req_EXPERIMENT"]
 
-STRS = [
-    "struc_SUMMARY",
-    "struc_HEADING",
-    "struc_QUOTE"
-]
+STRS = ["struc_SUMMARY", "struc_HEADING", "struc_QUOTE"]
 
-ALL = ARGS+ASPS+REQS+STRS 
+ALL = ARGS + ASPS + REQS + STRS
 
 PATH = "/home/jupyter/00_daniel/00_reviews/00_data/"
 
@@ -120,11 +112,11 @@ def get_sentences_df(df):
         ms_id = row["Manuscript_no_"]
         for i, sentence in enumerate(SENTENCIZE_PIPELINE(raw_text).sentences):
             sentence_dct = {
-                    "manuscript_no": ms_id,
-                    "review_id": review_id,
-                    "identifier": _make_identifier(review_id, i),
-                    "text": sentence.text,
-                }
+                "manuscript_no": ms_id,
+                "review_id": review_id,
+                "identifier": _make_identifier(review_id, i),
+                "text": sentence.text,
+            }
             sentence_dct.update(dict.fromkeys([all.lower() for all in ALL], int(0)))
             sentence_dicts.append(sentence_dct)
     return pd.DataFrame.from_dict(sentence_dicts)
@@ -132,17 +124,16 @@ def get_sentences_df(df):
 
 def label_sentences(sentences_df, n_sents, first_time, file_path):
     sentences_df = sentences_df.iloc[:n_sents]
-    
 
     mode = "a"
-    if first_time == "True": 
-        mode = 'w' 
+    if first_time == "True":
+        mode = "w"
 
     with open(file_path, mode=mode) as f:
         writer = csv.DictWriter(f, sentences_df.columns)
-        if mode == 'w':
+        if mode == "w":
             writer.writeheader()
-        
+
         n_sentences = 0
         for _, sentence_dct in sentences_df.iterrows():
             sentence_dct = sentence_dct.to_dict()
@@ -156,19 +147,18 @@ def label_sentences(sentences_df, n_sents, first_time, file_path):
             # Print Sentence and its identifiers
             print()
             print("-" * 100)
-            print(f"SENTENCE {n_sentences} OF {sentences_df.shape[0]} SENTENCES TO RATE")
+            print(
+                f"SENTENCE {n_sentences} OF {sentences_df.shape[0]} SENTENCES TO RATE"
+            )
             print(f"M_ID: {mid}\tR_ID: {rid}\tS_ID: {sid}")
             print("-" * 50)
             pp.pprint(f"{sentence_dct['text']}")
             print("-" * 100)
 
-
-
             print("\n\tSelect the action of this sentence:")
             for arg in ARGS:
                 value = int(input(f"\t\t{arg}: "))
                 sentence_dct[arg.lower()] = value
-            
 
             if sentence_dct["arg_request"] == 1:
 
@@ -185,16 +175,15 @@ def label_sentences(sentences_df, n_sents, first_time, file_path):
                 for asp in ASPS:
                     value = int(input(f"\t\t{asp}: "))
                     sentence_dct[asp.lower()] = value
-            
 
             elif sentence_dct["arg_structuring"] == 1:
-                
+
                 # Get fine grained structure
                 print("\n\tSelect the kind of structuring of this sentence:")
                 for struc in STRS:
                     value = int(input(f"\t\t{struc}: "))
                     sentence_dct[struc.lower()] = value
-                        
+
             elif sentence_dct["arg_evaluative"] == 1:
 
                 # Get aspect when eval
@@ -203,14 +192,13 @@ def label_sentences(sentences_df, n_sents, first_time, file_path):
                 )
                 for asp in ASPS:
                     value = int(input(f"\t\t{asp}: "))
-                    sentence_dct[asp.lower()] = value     
+                    sentence_dct[asp.lower()] = value
 
-
-            writer.writerow(sentence_dct) 
+            writer.writerow(sentence_dct)
 
 
 def hello():
-    print("\n"*3)
+    print("\n" * 3)
     print("+" * 33)
     print("START INTERACTIVE CODING SESSION!")
     print("+" * 33)
@@ -221,7 +209,7 @@ def goodbye():
     print("+" * 33)
     print("END INTERACTIVE CODING SESSION!")
     print("+" * 33)
-    print("\n"*3)
+    print("\n" * 3)
 
 
 def main(n_reviews, n_sents, first_time, file_path):
@@ -229,7 +217,7 @@ def main(n_reviews, n_sents, first_time, file_path):
     # Get data
     sentences_df = summon_reviews(n_reviews)
     sentences_df = get_sentences_df(sentences_df)
-    
+
     # Begin
     hello()
 
@@ -243,16 +231,18 @@ def main(n_reviews, n_sents, first_time, file_path):
         # open existing rated reviews file
         rater_df = pd.read_csv(file_path)
         already_reviewed = list(rater_df["identifier"])
-        sentences_df = sentences_df[~ sentences_df["identifier"].isin(already_reviewed)]
+        sentences_df = sentences_df[~sentences_df["identifier"].isin(already_reviewed)]
         label_sentences(sentences_df, n_sents, first_time, file_path)
-    
+
     # End
     goodbye()
 
 
 if __name__ == "__main__":
     args = parser.parse_args()
-    main(int(args.n_reviews),
-         int(args.n_sents),
-         args.first_time.capitalize(), 
-         args.file_path)
+    main(
+        int(args.n_reviews),
+        int(args.n_sents),
+        args.first_time.capitalize(),
+        args.file_path,
+    )
