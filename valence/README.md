@@ -77,18 +77,29 @@ This produces the file `preprocessed_elife_mini_predictions.jsonl`.
 
 ## Label eLife
 
-This script generates a hand-labeled eLife dataset with `-n_reviews` labeled through an interactive command line prompt. It summons the reviews from BQ, tokenizes their sentences, prints each sentence, and then asks the user to label the various aspects or arguments present in the sentence. It finally writes (all at once, not line by line) `{lastname}_disapere_elife_labels.csv` here `/home/jupyter/00_daniel/00_reviews/00_data/`.
+This script generates a hand-labeled eLife dataset with `-n_reviews` labeled through an interactive command line prompt. It summons the reviews from BQ, tokenizes their sentences, prints each sentence, and then asks the user to label the various aspects or arguments present in the sentence. It writes the labels of each sentence, sentence by sentence, at the specified local path. 
 
-Example command:
+First, activate the conda env:
 ```
 conda activate elife-sim
-python 05_label_elife.py -n 2
 ```
+
+Example command of the very first time rating:
 ```
-conda activate elife-sim
-python 05_label_elife.py -n_reviews 2 
+python 05_label_elife.py --file_path ~/my_labels.csv --n_reviews 1 --n_sents 2 --first_time true
 ```
-Caution!
-- If you select "True"  when prompted, "This is your first time (True/False):", and it is not your first time and you have in fact already labeled sentences, __you will lose all past work__.
-- If you make a typo, the script will either break or write the type to the file. In the case of the former, all data from that session will be lost. In case of the latter, you'll have to edit the file above by hand or start over.
-- There's an annoying BQ/pyarrow error. This can be ignored for now.
+
+Example command of returning to label:
+```
+python 05_label_elife.py -fp ~/my_labels.csv -nr 1 -ns 2 -ft false
+```
+This will return new, unlabeled sentences of the `nr` randomly sampled reviews and append these newly labeled ones to the ones you already labeled.
+
+Notes of caution:
+- If you put true for `ft` and your `file_path` is not new but contains previously labeled sentences, __this work will be overwritten.__
+- If you make a typo, the script will either break or write the typo to the file. 
+    - If the code breaks, the data from the sentence currently being labeled will be lost (others that were labeled before it are already saved). 
+    - If the code does not break, the typo will be written to the file and you'll need to fix it by hand. Make a note of the identifier for easy re-labeling down the line.
+- A smaller int for the arg `ns` means more breaks. It also means the reviews will be summoned from BQ more often (more queries).
+- If you want to abort a current coding session mid-sentence, just put any non-int value into the prompt (the current sentence labels won't be written).
+- Once we're confident that the script works, we can first put `n_reviews` to 10 for inter-rater reliability. We each will get the same randomly drawn sample of 10 reviews and all their sentences to label. Then, when we're ready to do more, we can each specifiy 100 or so. __Important__: for the purposes of validating the script and 

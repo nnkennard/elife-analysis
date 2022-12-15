@@ -14,11 +14,30 @@ pp = pprint.PrettyPrinter(width=100, compact=True)
 
 parser = argparse.ArgumentParser(description="Create examples for WS training")
 parser.add_argument(
-    "-n",
+    "-fp",
+    "--file_path",
+    type=str,
+    help="full file path to save labels",
+)
+parser.add_argument(
+    "-nr",
     "--n_reviews",
     type=str,
-    help="n reviews to label by hand",
+    help="n reviews to randomly sample",
 )
+parser.add_argument(
+    "-ns",
+    "--n_sents",
+    type=str,
+    help="n sentences to label by hand",
+)
+parser.add_argument(
+    "-ft",
+    "--first_time",
+    type=str,
+    help="first time?",
+)
+
 
 # Initialize google clients
 BQ_CLIENT = bigquery.Client()
@@ -29,36 +48,40 @@ SENTENCIZE_PIPELINE = stanza.Pipeline("en", processors="tokenize")
 
 # DISAPERE Labels
 ARGS = [
-    "REQUEST",
-    "FACT",
-    "STRUCTURING",
-    "SOCIAL",
+    "arg_EVALUATIVE",
+    "arg_REQUEST",
+    "arg_FACT",
+    "arg_STRUCTURING",
+    "arg_SOCIAL",
+    "arg_OTHER",
 ]
 
 ASPS = [
-    "MOTIVATION-IMPACT",
-    "ORIGINALITY",
-    "SOUNDNESS-CORRECTNESS",
-    "SUBSTANCE",
-    "REPLICABILITY",
-    "MEANINGFUL-COMPARISON",
-    "CLARITY",
+    "asp_MOTIVATION-IMPACT",
+    "asp_ORIGINALITY",
+    "asp_SOUNDNESS-CORRECTNESS",
+    "asp_SUBSTANCE",
+    "asp_REPLICABILITY",
+    "asp_MEANINGFUL-COMPARISON",
+    "asp_CLARITY",
+    "asp_OTHER",
 ]
 
+REQS = [
+    "req_EDIT",
+    "req_TYPO",
+    "req_EXPERIMENT"
+]
+
+STRS = [
+    "struc_SUMMARY",
+    "struc_HEADING",
+    "struc_QUOTE"
+]
+
+ALL = ARGS+ASPS+REQS+STRS 
+
 PATH = "/home/jupyter/00_daniel/00_reviews/00_data/"
-
-
-def GetInfo():
-    """
-    Requests conder info to use in writing/appending
-    the their own labeled reviews csv
-    """
-    first_time = input("This is your first time (True/False): ").capitalize()
-    rater = input("Last name: ").lower()
-    n_to_rate = input(
-        "How many review sentences do you want to rate?\n(Fewer means more breaks): "
-    )
-    return eval(first_time), rater, eval(n_to_rate)
 
 
 def summon_reviews(n_reviews):
@@ -71,10 +94,14 @@ def summon_reviews(n_reviews):
     SELECT Manuscript_no_, review_id, rating_hat, Major_comments,
     FROM `gse-nero-dmcfarla-mimir`.eLife.eLife_Reviews_IDRating
     """
+    print("Getting data from BQ...")
 
+    # df = BQ_CLIENT.query(REVIEW_QRY)
+    # print(type(df))
+    # df = pd.DataFrame(df).dropna()
     df = BQ_CLIENT.query(REVIEW_QRY).result().to_dataframe()
-    df_nonans = df.dropna()
-    return df_nonans.sample(n_reviews, random_state=72)
+    df = df.dropna()
+    return df.sample(n_reviews, random_state=72)
 
 
 def _make_identifier(review_id, index):
@@ -92,25 +119,35 @@ def get_sentences_df(df):
         raw_text = row["Major_comments"]
         ms_id = row["Manuscript_no_"]
         for i, sentence in enumerate(SENTENCIZE_PIPELINE(raw_text).sentences):
-            sentence_dicts.append(
-                {
+            sentence_dct = {
                     "manuscript_no": ms_id,
                     "review_id": review_id,
                     "identifier": _make_identifier(review_id, i),
                     "text": sentence.text,
                 }
-            )
+            sentence_dct.update(dict.fromkeys([all.lower() for all in ALL], int(0)))
+            sentence_dicts.append(sentence_dct)
     return pd.DataFrame.from_dict(sentence_dicts)
 
 
-def label_sentences(sentence_df, n_to_rate):
-    n_reviews = 0
-    for review_id, review_df in sentence_df.groupby("review_id"):
-        n_reviews += 1
+def label_sentences(sentences_df, n_sents, first_time, file_path):
+    sentences_df = sentences_df.iloc[:n_sents]
+    
+
+    mode = "a"
+    if first_time == "True": 
+        mode = 'w' 
+
+    with open(file_path, mode=mode) as f:
+        writer = csv.DictWriter(f, sentences_df.columns)
+        if mode == 'w':
+            writer.writeheader()
+        
         n_sentences = 0
-        sentence_dicts = []
-        for _, sentence_dct in review_df.iterrows():
+        for _, sentence_dct in sentences_df.iterrows():
+            sentence_dct = sentence_dct.to_dict()
             n_sentences += 1
+
             # Get identifying info
             mid = sentence_dct["manuscript_no"]
             rid = sentence_dct["review_id"]
@@ -119,126 +156,103 @@ def label_sentences(sentence_df, n_to_rate):
             # Print Sentence and its identifiers
             print()
             print("-" * 100)
-            print(f"SENTENCE {n_sentences} OF {n_to_rate} SENTENCES TO RATE")
+            print(f"SENTENCE {n_sentences} OF {sentences_df.shape[0]} SENTENCES TO RATE")
             print(f"M_ID: {mid}\tR_ID: {rid}\tS_ID: {sid}")
             print("-" * 50)
             pp.pprint(f"{sentence_dct['text']}")
             print("-" * 100)
 
-            # Ask if evaluative
-            evaluative = input(
-                "\tThis sentence subjectively evaluates the manuscript (0=no, 1=yes): "
-            )
-            sentence_dct["arg_evaluative"] = int(evaluative)
 
-            if sentence_dct["arg_evaluative"] == 0:
 
-                # Get arg when non-eval
-                print("\n\tSelect the non-evaluative action of this sentence:")
-                for arg in ARGS:
-                    key = f"arg_{arg.lower()}"
-                    value = input(f"\t\t{arg}: ")
-                    sentence_dct[key] = int(value)
-                key = "arg_other"
-                val = input("\t\tOther argument (0 or write in): ")
+            print("\n\tSelect the action of this sentence:")
+            for arg in ARGS:
+                value = int(input(f"\t\t{arg}: "))
+                sentence_dct[arg.lower()] = value
+            
 
-                if sentence_dct["arg_request"] == 1:
+            if sentence_dct["arg_request"] == 1:
 
-                    # Get fine grained req
-                    print("\n\tSelect what this sentence requests:")
-                    for req in "Experiment Edit Typo".split():
-                        key = f"req_{req.lower()}"
-                        value = input(f"\t\t{req}: ")
-                        sentence_dct[key] = int(value)
+                # Get fine grained req
+                print("\n\tSelect what this sentence requests:")
+                for req in REQS:
+                    value = int(input(f"\t\t{req}: "))
+                    sentence_dct[req.lower()] = value
 
-                    # Get aspect when req
-                    print(
-                        "\n\tSelect the aspect of the manuscript that is the subject of this sentence's request:"
-                    )
-                    for asp in ASPS:
-                        key = f"asp_{asp.lower()}"
-                        value = input(f"\t\t{asp}: ")
-                        sentence_dct[key] = int(value)
-                    key = "asp_other"
-                    val = input("\t\tOther aspect (0 or write in): ")
+                # Get aspect when req
+                print(
+                    "\n\tSelect the aspect of the manuscript that is the subject of this sentence's request:"
+                )
+                for asp in ASPS:
+                    value = int(input(f"\t\t{asp}: "))
+                    sentence_dct[asp.lower()] = value
+            
 
-                elif sentence_dct["arg_structuring"] == 1:
-                    print("\n\tSelect the kind of structuring of this sentence:")
-                    for struc in "Summary Heading Quote".split():
-                        key = f"req_{struc.lower()}"
-                        value = input(f"\t\t{struc}: ")
-                        sentence_dct[key] = int(value)
-
-                else:
-                    # Null vals for asps when arg is non-eval
-                    for asp in ASPS:
-                        key = f"asp_{asp.lower()}"
-                        sentence_dct[key] = 0
-
-            else:
-
-                # Null vals for other args when arg is eval
-                for arg in ARGS:
-                    key = f"arg_{arg.lower()}"
-                    sentence_dct[key] = 0
+            elif sentence_dct["arg_structuring"] == 1:
+                
+                # Get fine grained structure
+                print("\n\tSelect the kind of structuring of this sentence:")
+                for struc in STRS:
+                    value = int(input(f"\t\t{struc}: "))
+                    sentence_dct[struc.lower()] = value
+                        
+            elif sentence_dct["arg_evaluative"] == 1:
 
                 # Get aspect when eval
                 print(
                     "\n\tSelect the aspect of the manuscript that this sentence evaluates:"
                 )
                 for asp in ASPS:
-                    key = f"asp_{asp.lower()}"
-                    value = input(f"\t\t{asp}: ")
-                    sentence_dct[key] = int(value)
-                key = "asp_other"
-                val = input("\t\tOther aspect (0 or write in): ")
-        sentence_dicts.append(sentence_dct)
-    sentences_df = pd.DataFrame.from_dict(sentence_dicts)
-    return sentences_df
+                    value = int(input(f"\t\t{asp}: "))
+                    sentence_dct[asp.lower()] = value     
 
 
-def start_up_message():
-    print()
-    print()
-    print()
-    print("*" * 33)
-    print("-" * 33)
+            writer.writerow(sentence_dct) 
+
+
+def hello():
+    print("\n"*3)
+    print("+" * 33)
     print("START INTERACTIVE CODING SESSION!")
-    print("-" * 33)
-    print("*" * 33)
+    print("+" * 33)
 
 
-def main(n_reviews):
+def goodbye():
+    print()
+    print("+" * 33)
+    print("END INTERACTIVE CODING SESSION!")
+    print("+" * 33)
+    print("\n"*3)
+
+
+def main(n_reviews, n_sents, first_time, file_path):
 
     # Get data
-    print("Getting data from BQ...")
-    df = summon_reviews(n_reviews)
-    sentences_df = get_sentences_df(df)
-
-    start_up_message()
-
-    # Get user info
-    first_time, rater, n_to_rate = GetInfo()
-    rater_file = "{}_disapere_elife_labels.csv".format(rater)
+    sentences_df = summon_reviews(n_reviews)
+    sentences_df = get_sentences_df(sentences_df)
+    
+    # Begin
+    hello()
 
     # first time means new file
-    if first_time == True:
-        sentences_df = sentences_df.iloc[:n_to_rate]
-        sentences_df = label_sentences(sentences_df, n_to_rate)
-        sentences_df.to_csv(PATH + rater_file, header=True, mode="w", index=False)
+    if first_time == "True":
+        label_sentences(sentences_df, n_sents, first_time, file_path)
 
     # nth time means append file, and make sure only unrated reviews are printed
-    if first_time == False:
+    if first_time == "False":
 
         # open existing rated reviews file
-        rater_df = pd.read_csv(PATH + rater_file)
+        rater_df = pd.read_csv(file_path)
         already_reviewed = list(rater_df["identifier"])
-        sentences_df = sentences_df[~sentences_df["identifier"].isin(already_reviewed)]
-        sentences_df = sentences_df[:n_to_rate]
-        sentences_df = label_sentences(sentences_df, n_to_rate)
-        sentences_df.to_csv(PATH + rater_file, header=False, mode="a", index=False)
+        sentences_df = sentences_df[~ sentences_df["identifier"].isin(already_reviewed)]
+        label_sentences(sentences_df, n_sents, first_time, file_path)
+    
+    # End
+    goodbye()
 
 
 if __name__ == "__main__":
     args = parser.parse_args()
-    main(int(args.n_reviews))
+    main(int(args.n_reviews),
+         int(args.n_sents),
+         args.first_time.capitalize(), 
+         args.file_path)
