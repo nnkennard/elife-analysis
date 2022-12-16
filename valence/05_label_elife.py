@@ -73,7 +73,7 @@ STRS = ["struc_SUMMARY", "struc_HEADING", "struc_QUOTE"]
 
 ALL = ARGS + ASPS + REQS + STRS
 
-ALL.extend(['neg_polarity', 'pos_polarity'])
+ALL.extend(["neg_polarity", "pos_polarity"])
 
 
 def summon_reviews(n_reviews):
@@ -178,11 +178,11 @@ def label_sentences(sentences_df, n_sents, first_time, file_path):
                 for asp in ASPS:
                     if asp != "asp_OTHER":
                         value = int(input(f"\t\t{asp}: "))
-                    else: 
+                    else:
                         value = input(f"\t\t{asp} (write it in): ")
                     sentence_dct[asp.lower()] = value
-                    
-                sentence_dct['neg_polarity'] = 1
+
+                sentence_dct["neg_polarity"] = 1
 
             elif sentence_dct["arg_structuring"] == 1:
 
@@ -195,17 +195,19 @@ def label_sentences(sentences_df, n_sents, first_time, file_path):
             elif sentence_dct["arg_evaluative"] == 1:
 
                 # Get aspect when eval
-                sentence_dct['pos_polarity'] = int(input("\n\tIs the evaluation positive? (0/1): "))
-                if sentence_dct['pos_polarity'] == 0:
-                    sentence_dct['neg_polarity'] = 1
-                
+                sentence_dct["pos_polarity"] = int(
+                    input("\n\tIs the evaluation positive? (0/1): ")
+                )
+                if sentence_dct["pos_polarity"] == 0:
+                    sentence_dct["neg_polarity"] = 1
+
                 print(
                     f"\n\tSelect the aspect of the manuscript that this sentence evaluates:"
                 )
                 for asp in ASPS:
                     if asp != "asp_OTHER":
                         value = int(input(f"\t\t{asp}: "))
-                    else: 
+                    else:
                         value = input(f"\t\t{asp} (write it in): ")
                     sentence_dct[asp.lower()] = value
 
