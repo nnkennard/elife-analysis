@@ -73,7 +73,7 @@ STRS = ["struc_SUMMARY", "struc_HEADING", "struc_QUOTE"]
 
 ALL = ARGS + ASPS + REQS + STRS
 
-PATH = "/home/jupyter/00_daniel/00_reviews/00_data/"
+ALL.extend(['neg_polarity', 'pos_polarity'])
 
 
 def summon_reviews(n_reviews):
@@ -126,7 +126,7 @@ def label_sentences(sentences_df, n_sents, first_time, file_path):
     sentences_df = sentences_df.iloc[:n_sents]
 
     mode = "a"
-    if first_time == "True":
+    if first_time == True:
         mode = "w"
 
     with open(file_path, mode=mode) as f:
@@ -148,7 +148,7 @@ def label_sentences(sentences_df, n_sents, first_time, file_path):
             print()
             print("-" * 100)
             print(
-                f"SENTENCE {n_sentences} OF {sentences_df.shape[0]} SENTENCES TO RATE"
+                f"SENTENCE {n_sentences} OF {sentences_df.shape[0]} SENTENCES TO RATE IN THIS SESSION"
             )
             print(f"M_ID: {mid}\tR_ID: {rid}\tS_ID: {sid}")
             print("-" * 50)
@@ -157,7 +157,10 @@ def label_sentences(sentences_df, n_sents, first_time, file_path):
 
             print("\n\tSelect the action of this sentence:")
             for arg in ARGS:
-                value = int(input(f"\t\t{arg}: "))
+                if arg != "arg_OTHER":
+                    value = int(input(f"\t\t{arg}: "))
+                else:
+                    value = input(f"\t\t{arg} (write it in): ")
                 sentence_dct[arg.lower()] = value
 
             if sentence_dct["arg_request"] == 1:
@@ -173,8 +176,13 @@ def label_sentences(sentences_df, n_sents, first_time, file_path):
                     "\n\tSelect the aspect of the manuscript that is the subject of this sentence's request:"
                 )
                 for asp in ASPS:
-                    value = int(input(f"\t\t{asp}: "))
+                    if asp != "asp_OTHER":
+                        value = int(input(f"\t\t{asp}: "))
+                    else: 
+                        value = input(f"\t\t{asp} (write it in): ")
                     sentence_dct[asp.lower()] = value
+                    
+                sentence_dct['neg_polarity'] = 1
 
             elif sentence_dct["arg_structuring"] == 1:
 
@@ -187,11 +195,18 @@ def label_sentences(sentences_df, n_sents, first_time, file_path):
             elif sentence_dct["arg_evaluative"] == 1:
 
                 # Get aspect when eval
+                sentence_dct['pos_polarity'] = int(input("\n\tIs the evaluation positive? (0/1): "))
+                if sentence_dct['pos_polarity'] == 0:
+                    sentence_dct['neg_polarity'] = 1
+                
                 print(
-                    "\n\tSelect the aspect of the manuscript that this sentence evaluates:"
+                    f"\n\tSelect the aspect of the manuscript that this sentence evaluates:"
                 )
                 for asp in ASPS:
-                    value = int(input(f"\t\t{asp}: "))
+                    if asp != "asp_OTHER":
+                        value = int(input(f"\t\t{asp}: "))
+                    else: 
+                        value = input(f"\t\t{asp} (write it in): ")
                     sentence_dct[asp.lower()] = value
 
             writer.writerow(sentence_dct)
@@ -222,16 +237,18 @@ def main(n_reviews, n_sents, first_time, file_path):
     hello()
 
     # first time means new file
-    if first_time == "True":
+    if first_time == True:
+        print(f"{sentences_df.shape[0]} total sentences to label.")
         label_sentences(sentences_df, n_sents, first_time, file_path)
 
     # nth time means append file, and make sure only unrated reviews are printed
-    if first_time == "False":
+    if first_time == False:
 
         # open existing rated reviews file
         rater_df = pd.read_csv(file_path)
         already_reviewed = list(rater_df["identifier"])
         sentences_df = sentences_df[~sentences_df["identifier"].isin(already_reviewed)]
+        print(f"{sentences_df.shape[0]} sentences left to label.")
         label_sentences(sentences_df, n_sents, first_time, file_path)
 
     # End
@@ -243,6 +260,6 @@ if __name__ == "__main__":
     main(
         int(args.n_reviews),
         int(args.n_sents),
-        args.first_time.capitalize(),
+        eval(args.first_time.capitalize()),
         args.file_path,
     )
