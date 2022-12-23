@@ -37,7 +37,12 @@ parser.add_argument(
     type=str,
     help="first time?",
 )
-
+parser.add_argument(
+    "-v",
+    "--validate",
+    type=str,
+    help="True or False: print labeled reviews to validate",
+)
 
 # Initialize google clients
 BQ_CLIENT = bigquery.Client()
@@ -217,45 +222,60 @@ def label_sentences(sentences_df, n_sents, first_time, file_path):
 def hello():
     print("\n" * 3)
     print("+" * 33)
-    print("START INTERACTIVE CODING SESSION!")
+    print("START INTERACTIVE SESSION!")
     print("+" * 33)
-
 
 def goodbye():
     print()
     print("+" * 33)
-    print("END INTERACTIVE CODING SESSION!")
+    print("END INTERACTIVE SESSION!")
     print("+" * 33)
     print("\n" * 3)
 
 
-def main(n_reviews, n_sents, first_time, file_path):
-
+def main(n_reviews, n_sents, first_time, file_path, validate):
+    
     # Get data
     sentences_df = summon_reviews(n_reviews)
     sentences_df = get_sentences_df(sentences_df)
-
+    
     # Begin
     hello()
+        
+    # if labeling:
+    if validate == False: 
 
-    # first time means new file
-    if first_time == True:
-        print(f"{sentences_df.shape[0]} total sentences to label.")
-        label_sentences(sentences_df, n_sents, first_time, file_path)
+        # first time means new file
+        if first_time == True:
+            print(f"{sentences_df.shape[0]} total sentences to label.")
+            label_sentences(sentences_df, n_sents, first_time, file_path)
 
-    # nth time means append file, and make sure only unrated reviews are printed
-    if first_time == False:
+        # nth time means append file, and make sure only unrated reviews are printed
+        if first_time == False:
 
-        # open existing rated reviews file
-        rater_df = pd.read_csv(file_path)
-        already_reviewed = list(rater_df["identifier"])
-        sentences_df = sentences_df[~sentences_df["identifier"].isin(already_reviewed)]
-        print(f"{sentences_df.shape[0]} sentences left to label.")
-        label_sentences(sentences_df, n_sents, first_time, file_path)
-
-    # End
-    goodbye()
-
+            # open existing rated reviews file
+            rater_df = pd.read_csv(file_path)
+            already_reviewed = list(rater_df["identifier"])
+            sentences_df = sentences_df[~sentences_df["identifier"].isin(already_reviewed)]
+            print(f"{sentences_df.shape[0]} sentences left to label.")
+            label_sentences(sentences_df, n_sents, first_time, file_path)
+        
+        
+    # if validating: 
+    if validate == True: 
+        flags = input("Enter sentence ids: ").split(",")
+        for flag in flags: 
+            sent = sentences_df[sentences_df['identifier'] == flag]['text'].iloc[0]
+            pp.pprint(sent)
+            print()
+            advance = eval(input("Advance?: "))
+            if advance == 1: 
+                pass
+            else:
+                pass
+                
+     # End
+    goodbye()       
 
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -264,4 +284,6 @@ if __name__ == "__main__":
         int(args.n_sents),
         eval(args.first_time.capitalize()),
         args.file_path,
+        eval(args.validate)
+        
     )
