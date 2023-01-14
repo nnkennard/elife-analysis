@@ -42,6 +42,7 @@ parser.add_argument(
     "--validate",
     type=str,
     help="True or False: print labeled reviews to validate",
+    required=False,
 )
 
 # Initialize google clients
@@ -92,12 +93,9 @@ def summon_reviews(n_reviews):
     FROM `gse-nero-dmcfarla-mimir`.eLife.eLife_Reviews_IDRating
     """
     print("Getting data from BQ...")
-
-    # df = BQ_CLIENT.query(REVIEW_QRY)
-    # print(type(df))
-    # df = pd.DataFrame(df).dropna()
     df = BQ_CLIENT.query(REVIEW_QRY).result().to_dataframe()
     df = df.dropna()
+    # TODO: sample within score strata
     return df.sample(n_reviews, random_state=72)
 
 
@@ -269,10 +267,6 @@ def main(n_reviews, n_sents, first_time, file_path, validate):
             pp.pprint(sent)
             print()
             advance = eval(input("Advance?: "))
-            if advance == 1: 
-                pass
-            else:
-                pass
                 
      # End
     goodbye()       
@@ -285,5 +279,4 @@ if __name__ == "__main__":
         eval(args.first_time.capitalize()),
         args.file_path,
         eval(args.validate)
-        
     )
