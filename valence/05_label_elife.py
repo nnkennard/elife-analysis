@@ -96,7 +96,7 @@ def summon_reviews(n_reviews):
     df = BQ_CLIENT.query(REVIEW_QRY).result().to_dataframe()
     df = df.dropna()
     # TODO: sample within score strata
-    return df.sample(n_reviews, random_state=72)
+    return df.sample(n_reviews, random_state=7272)
 
 
 def _make_identifier(review_id, index):
