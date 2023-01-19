@@ -1,29 +1,217 @@
+from contextlib import nullcontext
 import json
+import numpy as np
 import os
+import torch
+from torch.utils.data import Dataset, DataLoader
+import torch.nn as nn
+import tqdm
+from transformers import BertTokenizer, BertModel
 
-TRAIN, EVAL, PREDICT = "train eval predict".split()
+TRAIN, EVAL, PREDICT, DEV, TEST = "train eval predict dev test".split()
 MODES = [TRAIN, EVAL, PREDICT]
 
+BATCH_SIZE = 8
+PRE_TRAINED_MODEL_NAME = "bert-base-uncased"
 
-def get_features_and_labels(data_dir, get_labels=False):
+# Wrapper around the tokenizer specifying the details of the BERT input
+# encoding.
+tokenizer_fn = lambda tok, text: tok.encode_plus(
+    text,
+    add_special_tokens=True,
+    return_token_type_ids=False,
+    padding="max_length",
+    max_length=512,
+    truncation=True,
+    return_attention_mask=True,
+    return_tensors="pt",
+)
 
-  features = []
+def make_identifier(review_id, index):
+    return f"{review_id}|||{index}"
+
+
+def get_text_and_labels(task_dir, subset, get_labels=False):
+
   texts = []
   identifiers = []
-  with open(f"{data_dir}/features.jsonl", "r") as f:
+  labels = []
+  with open(f"{task_dir}/{subset}.jsonl", "r") as f:
     for line in f:
       example = json.loads(line)
-      features.append(example["features"])
       texts.append(example["text"])
       identifiers.append(example["identifier"])
-  if get_labels:
-    labels = []
-    with open(f"{data_dir}/labels.jsonl", "r") as f:
-      for i, line in enumerate(f):
-        example = json.loads(line)
-        assert example["identifier"] == identifiers[i]
+      if get_labels:
         labels.append(example["label"])
-  else:
+  if not get_labels:
     labels = None
 
-  return identifiers, features, texts, labels
+  return identifiers, texts, labels
+
+class ClassificationDataset(Dataset):
+    """A torch.utils.data.Dataset for binary classification."""
+
+    def __init__(self, task_dir, subset, tokenizer, max_len=512):
+        (
+            self.identifiers,
+            self.texts,
+            self.target_indices,
+        ) = get_text_and_labels(task_dir, subset, get_labels=True)
+        target_set = set(self.target_indices)
+        assert list(sorted(target_set)) == list(range(len(target_set)))
+        eye = np.eye(
+            len(target_set), dtype=np.float64
+        )  # An identity matrix to easily switch to and from one-hot encoding.
+        self.targets = [eye[int(i)] for i in self.target_indices]
+        self.tokenizer = tokenizer
+        self.max_len = max_len
+
+    def __len__(self):
+        return len(self.texts)
+
+    def __getitem__(self, item):
+        text = str(self.texts[item])
+        target = self.targets[item]
+
+        encoding = tokenizer_fn(self.tokenizer, text)
+
+        return {
+            "reviews_text": text,
+            "input_ids": encoding["input_ids"].flatten(),
+            "attention_mask": encoding["attention_mask"].flatten(),
+            "targets": torch.tensor(target, dtype=torch.float64),
+            "target_indices": self.target_indices[item],
+            "identifier": self.identifiers[item],
+        }
+
+def create_data_loader(task_dir, subset, tokenizer):
+    """Wrap a DataLoader around a PolarityDetectionDataset.
+
+    While the dataset manages the content of the data, the data loader is more
+    concerned with how the data is doled out, and is the connection between the
+    dataset and the model.
+    """
+    ds = ClassificationDataset(
+        task_dir,
+        subset,
+        tokenizer=tokenizer,
+    )
+    return DataLoader(ds, batch_size=BATCH_SIZE, num_workers=4)
+
+
+def build_data_loaders(task_dir, tokenizer):
+    """Build train and dev data loaders from a structured data directory.
+
+    TODO(nnk): Investigate why there is no test data loader.
+    """
+    return (
+        create_data_loader(
+            task_dir,
+            TRAIN,
+            tokenizer,
+        ),
+        create_data_loader(
+            task_dir,
+            DEV,
+            tokenizer,
+        ),
+    )
+
+
+class Classifier(nn.Module):
+    def __init__(self, num_classes):
+        super(Classifier, self).__init__()
+        self.bert = BertModel.from_pretrained(PRE_TRAINED_MODEL_NAME)
+        self.drop = nn.Dropout(p=0.3)
+        self.out = nn.Linear(self.bert.config.hidden_size, num_classes)
+        if num_classes == 2:
+            self.loss_fn = nn.BCEWithLogitsLoss()  # Not sure if this is reasonable
+        else:
+            self.loss_fn = nn.CrossEntropyLoss()
+
+    def forward(self, input_ids, attention_mask):  # This function is required
+        bert_output = self.bert(input_ids=input_ids, attention_mask=attention_mask)
+        output = self.drop(bert_output["pooler_output"])
+        return self.out(output)
+
+
+
+def get_label_list(data_dir, task):
+    with open(f"{data_dir}/{task}/metadata.json", "r") as f:
+        return json.load(f)["labels"]
+
+
+def make_checkpoint_path(data_dir, task):
+    task_dir = f"{data_dir}/{task}/"
+    ckpt_dir = f"{task_dir}/ckpt"
+    os.makedirs(ckpt_dir, exist_ok=True)
+    return task_dir
+
+def train_or_eval(
+    mode,
+    model,
+    data_loader,
+    device,
+    return_preds=False,
+    optimizer=None,
+    scheduler=None,
+):
+  """Do a forward pass of the model, backpropagating only for TRAIN passes.
+  """
+  assert mode in [TRAIN, EVAL]
+  is_train = mode == TRAIN
+  if is_train:
+    model = model.train() # Put the model in train mode
+    context = nullcontext()
+    # ^ This is so that we can reuse code between this mode and eval mode, when
+    # we do have to specify a context
+    assert optimizer is not None # Required for backprop
+    assert scheduler is not None # Required for backprop
+  else:
+    model = model.eval() # Put the model in eval mode
+    context = torch.no_grad() # Don't backpropagate
+
+  results = []
+  losses = []
+  correct_predictions = 0
+  n_examples = len(data_loader.dataset)
+
+  with context:
+    for d in tqdm.tqdm(data_loader): # Load batchwise
+      input_ids, attention_mask, targets, target_indices = [
+          d[k].to(device) # Move all this stuff to gpu
+          for k in "input_ids attention_mask targets target_indices".split()
+      ]
+
+      outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+      # ^ this gives logits
+      _, preds = torch.max(outputs, dim=1)
+      # TODO(nnk): make this argmax!
+      if return_preds:
+      # If this is being run as part of prediction, we need to return the
+      # predicted indices. If we are just evaluating, we just need loss and/or
+      # accuracy
+        results.append((d["identifier"], preds.cpu().numpy().tolist()))
+
+      # We need loss for both train and eval
+      loss = model.loss_fn(outputs, targets)
+      losses.append(loss.item())
+
+      # Counting correct predictions in order to calculate accuracy later
+      correct_predictions += torch.sum(preds == target_indices)
+
+      if is_train:
+        # Backpropagation steps
+        loss.backward()
+        nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+        optimizer.step()
+        scheduler.step()
+        optimizer.zero_grad()
+
+  if return_preds:
+    return results
+  else:
+    # Return accuracy and mean loss
+    return correct_predictions.double().item() / n_examples, np.mean(losses)
+
+
