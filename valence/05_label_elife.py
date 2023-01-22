@@ -95,8 +95,15 @@ def summon_reviews(n_reviews):
     print("Getting data from BQ...")
     df = BQ_CLIENT.query(REVIEW_QRY).result().to_dataframe()
     df = df.dropna()
-    # TODO: sample within score strata
-    return df.sample(n_reviews, random_state=7272)
+   
+    # ensure strata correspond with [1,4]
+    # < 1 and > 4 occur because bert pretrained on ICLR
+    # ensuring strata are in [1,4] also makes 
+    # groups suffuciently sized to sample within
+    df["rating_hat"] = df['rating_hat'].round()
+    df["rating_hat"] = df['rating_hat'].replace(5, 4)
+    df = df.groupby("rating_hat").sample(n_reviews, random_state=7272)
+    return df
 
 
 def _make_identifier(review_id, index):
