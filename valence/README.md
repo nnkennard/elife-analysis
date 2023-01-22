@@ -77,7 +77,7 @@ This produces the file `preprocessed_elife_mini_predictions.jsonl`.
 
 ## Label eLife
 
-This script generates a hand-labeled eLife dataset with `-n_reviews` labeled through an interactive command line prompt. It summons the reviews from BQ, tokenizes their sentences, prints each sentence, and then asks the user to label the various aspects or arguments present in the sentence. It writes the labels of each sentence, sentence by sentence, at the specified local path. 
+This script generates a hand-labeled eLife dataset with `-n_reviews` labeled through an interactive command line prompt. It summons `-n_reviews` with each score stratus [1,4] from BQ, tokenizes their sentences, prints each sentence, and then asks the user to label the various aspects or arguments present in the sentence. It writes the labels of each sentence, sentence by sentence, at the specified local path. 
 
 First, activate the conda env:
 ```
