@@ -44,7 +44,13 @@ parser.add_argument(
     help="True or False: print labeled reviews to validate",
     required=False,
 )
-
+parser.add_argument(
+    "-rs",
+    "--random_seed",
+    type=str,
+    help="Int",
+    required=False,
+)
 # Initialize google clients
 BQ_CLIENT = bigquery.Client()
 STORAGE_CLIENT = storage.Client()
@@ -82,7 +88,7 @@ ALL = ARGS + ASPS + REQS + STRS
 ALL.extend(["neg_polarity", "pos_polarity"])
 
 
-def summon_reviews(n_reviews):
+def summon_reviews(n_reviews, random_state):
     """
     Returns a pandas DF containing n sampled eLife reviews
     by summoning reviews from Google BQ.
@@ -100,9 +106,10 @@ def summon_reviews(n_reviews):
     # < 1 and > 4 occur because bert pretrained on ICLR
     # ensuring strata are in [1,4] also makes 
     # groups suffuciently sized to sample within
-    df["rating_hat"] = df['rating_hat'].round()
-    df["rating_hat"] = df['rating_hat'].replace(5, 4)
-    df = df.groupby("rating_hat").sample(n_reviews, random_state=7272)
+    # df["rating_hat"] = df['rating_hat'].round()
+    # df["rating_hat"] = df['rating_hat'].replace(5, 4)
+    # df = df.groupby("rating_hat").sample(n_reviews, random_state=random_state)
+    df = df.sample(n_reviews, random_state=random_state)
     return df
 
 
@@ -238,10 +245,10 @@ def goodbye():
     print("\n" * 3)
 
 
-def main(n_reviews, n_sents, first_time, file_path, validate):
+def main(n_reviews, n_sents, first_time, file_path, validate, random_state):
     
     # Get data
-    sentences_df = summon_reviews(n_reviews)
+    sentences_df = summon_reviews(n_reviews, random_state)
     sentences_df = get_sentences_df(sentences_df)
     
     # Begin
@@ -285,5 +292,6 @@ if __name__ == "__main__":
         int(args.n_sents),
         eval(args.first_time.capitalize()),
         args.file_path,
-        eval(args.validate)
+        eval(args.validate),
+        eval(args.random_state)
     )
