@@ -48,7 +48,7 @@ parser.add_argument(
     "-rs",
     "--random_seed",
     type=str,
-    help="Int",
+    help="Int of random seed",
     required=False,
 )
 # Initialize google clients
@@ -88,7 +88,7 @@ ALL = ARGS + ASPS + REQS + STRS
 ALL.extend(["neg_polarity", "pos_polarity"])
 
 
-def summon_reviews(n_reviews, random_state):
+def summon_reviews(n_reviews, random_seed):
     """
     Returns a pandas DF containing n sampled eLife reviews
     by summoning reviews from Google BQ.
@@ -108,8 +108,8 @@ def summon_reviews(n_reviews, random_state):
     # groups suffuciently sized to sample within
     # df["rating_hat"] = df['rating_hat'].round()
     # df["rating_hat"] = df['rating_hat'].replace(5, 4)
-    # df = df.groupby("rating_hat").sample(n_reviews, random_state=random_state)
-    df = df.sample(n_reviews, random_state=random_state)
+    # df = df.groupby("rating_hat").sample(n_reviews, random_state=random_seed)
+    df = df.sample(n_reviews, random_state=random_seed)
     return df
 
 
@@ -245,10 +245,10 @@ def goodbye():
     print("\n" * 3)
 
 
-def main(n_reviews, n_sents, first_time, file_path, validate, random_state):
+def main(n_reviews, n_sents, first_time, file_path, validate, random_seed):
     
     # Get data
-    sentences_df = summon_reviews(n_reviews, random_state)
+    sentences_df = summon_reviews(n_reviews, random_seed)
     sentences_df = get_sentences_df(sentences_df)
     
     # Begin
@@ -293,5 +293,5 @@ if __name__ == "__main__":
         eval(args.first_time.capitalize()),
         args.file_path,
         eval(args.validate),
-        eval(args.random_state)
+        eval(args.random_seed)
     )
