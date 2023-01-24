@@ -80,14 +80,26 @@ ALL.extend(["neg_polarity", "pos_polarity"])
 
 TASKS = "act asp req str pol".split()
 
-PROMPTS = {
-    "act": "\n\tSelect the action of this sentence:",
-    "req": "\n\tSelect what this sentence requests:",
-    "req_asp": "\n\tSelect the aspect of the manuscript that is the subject of this sentence's request:",
-    "struct": "\n\tSelect the kind of structuring of this sentence:",
-    "pol": "\n\tIs the evaluation positive? (0/1): ",
-    "evl_asp": "\n\tSelect the aspect of the manuscript that this sentence evaluates:",
+
+mini_labels = {
+        'act': "OTH EVL REQ STR SOC".split(),
+        'str': "SUM HDG QUO".split(),
+        'asp': "OTH MOT ORG SND SUB REP MNG CLR".split(),
+        'req': "EDT TYP EXP".split(),
+        'pol': "NEG POS".split()
 }
+
+def make_options_line(options):
+    return " | ".join(f'{m}: {i}' for i,m in enumerate(options))
+
+
+PROMPTS = {
+"act": "Select action: " + make_options_line(mini_labels['act']),
+"str": "Select structuring type: " + make_options_line(mini_labels['str']),
+"asp": "Select aspect: " + make_options_line(mini_labels['asp']),
+"req": "Select request type: " + make_options_line(mini_labels['req']),
+"pol": "Select polarity: " + make_options_line(mini_labels['pol'])
+        }
 
 
 def make_line(num_chars):
@@ -147,16 +159,29 @@ def get_sentences_df(df):
                 "identifier": _make_identifier(review_id, i),
                 "text": sentence.text,
             }
-            sentence_dct.update(dict.fromkeys([all.lower() for all in ALL], int(0)))
+            sentence_dct.update(dict.fromkeys(PROMPTS.keys(), int(0)))
             sentence_dicts.append(sentence_dct)
     return pd.DataFrame.from_dict(sentence_dicts)
 
 
-def get_input(label_name):
-    if 'OTHER' in label_name:
-      return input(f"\t\t{label_name} (write it in): ")
-    else:
-      return int(input(f"\t\t{label_name}: "))
+def get_input(sentence_dct, category):
+    print(PROMPTS[category])
+    options = mini_labels[category]
+    while True:
+        try:
+            input_val = input()
+            int_input = int(input_val)
+            if int_input not in range(len(options)):
+                print(f"[{input_val}] is not a valid input, please try again.")
+            elif int_input == 0 and options[0] == "OTH":
+                input_val = input("Write in: ")
+                sentence_dct[category] = f'other_{input_val}'
+                return
+            else:
+                sentence_dct[category] = options[int_input]
+                return
+        except ValueError:
+            print(f"[{input_val}] is not a valid input, please try again.")
 
 
 def label_sentences(sentences_df, n_sents, first_time, file_path):
@@ -173,34 +198,18 @@ def label_sentences(sentences_df, n_sents, first_time, file_path):
             sentence_dct = sentence_dct.to_dict()
             print_sentence_block(sentences_df, i, sentence_dct)
 
-            print(PROMPTS["act"])
-            for arg in ARGS:
-                sentence_dct[arg.lower()] = get_input(arg)
+            get_input(sentence_dct, 'act')
+            if sentence_dct['act'] == 'REQ':
+                get_input(sentence_dct, 'req')
+                get_input(sentence_dct, 'asp')
+                sentence_dct['pol'] = "NEG"
 
-            if sentence_dct["arg_request"] == 1:
-                print(PROMPTS["req"])
-                for req in REQS:
-                    sentence_dct[req.lower()] = get_input(req)
+            elif sentence_dct["act"] == "STR":
+                get_input(sentence_dct, 'str')
 
-                print(PROMPTS["req_asp"])
-                for asp in ASPS:
-                  sentence_dct[asp.lower()] = get_input(asp)
-
-                sentence_dct["neg_polarity"] = 1
-
-            elif sentence_dct["arg_structuring"] == 1:
-                print(PROMPTS['struct'])
-                for struc in STRS:
-                    sentence_dct[struc.lower()] = get_input(struc)
-
-            elif sentence_dct["arg_evaluative"] == 1:
-                print(PROMPTS['pol'])
-                sentence_dct["pos_polarity"] = get_input('pol')
-                sentence_dct["neg_polarity"] = 1- sentence_dct['pos_polarity']
-
-                print(PROMPTS['evl_asp'])
-                for asp in ASPS:
-                    sentence_dct[asp.lower()] = get_input(asp)
+            elif sentence_dct["act"] == "EVL":
+                get_input(sentence_dct, 'asp')
+                get_input(sentence_dct, 'pol')
 
             writer.writerow(sentence_dct)
 
