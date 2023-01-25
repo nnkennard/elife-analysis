@@ -77,7 +77,7 @@ This produces the file `preprocessed_elife_mini_predictions.jsonl`.
 
 ## Label eLife
 
-This script generates a hand-labeled eLife dataset with `-n_reviews` labeled through an interactive command line prompt. It summons the reviews from BQ, tokenizes their sentences, prints each sentence, and then asks the user to label the various aspects or arguments present in the sentence. It writes the labels of each sentence, sentence by sentence, at the specified local path. 
+This script generates a hand-labeled eLife dataset with `-n_reviews` labeled through an interactive command line prompt. It summons `-n_reviews` with each score stratus [1,4] from BQ, tokenizes their sentences, prints each sentence, and then asks the user to label the various aspects or arguments present in the sentence. It writes the labels of each sentence, sentence by sentence, at the specified local path. 
 
 First, activate the conda env:
 ```
@@ -86,12 +86,12 @@ conda activate elife-sim
 
 Example command of the very first time rating:
 ```
-python 05_label_elife.py --file_path ~/my_labels.csv --n_reviews 1 --n_sents 2 --first_time true --validate false
+python 05_label_elife.py --file_path ~/my_labels.csv --n_reviews 1 --n_sents 2 --first_time true --validate false --random_seed 7272
 ```
 
 Example command of returning to label:
 ```
-python 05_label_elife.py -fp ~/my_labels.csv -nr 1 -ns 2 -ft false -v false
+python 05_label_elife.py -fp ~/my_labels.csv -nr 1 -ns 2 -ft false -v false -rs 7272
 ```
 This will return new, unlabeled sentences of the `nr` randomly sampled reviews and append these newly labeled ones to the ones you already labeled.
 
@@ -102,4 +102,4 @@ Notes of caution:
     - If the code does not break, the typo will be written to the file and you'll need to fix it by hand. Make a note of the identifier for easy re-labeling down the line.
 - A smaller int for the arg `ns` means more breaks. It also means the reviews will be summoned from BQ more often (more queries).
 - If you want to abort a current coding session mid-sentence, just put any non-int value into the prompt (the current sentence labels won't be written).
-- We can first put `n_reviews` to 10 to dicuss and check inter-rater reliability. Then, when we're ready to do more, we can each specifiy 100 reviews or so. Or sentences???
+- Coordinate seeds among annotaters so that same reviews aren't labeled by each annotator *OR* so that same reviews *ARE* labeled by each annotator for validation purposes.

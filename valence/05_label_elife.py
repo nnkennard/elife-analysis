@@ -44,7 +44,13 @@ parser.add_argument(
     help="True or False: print labeled reviews to validate",
     required=False,
 )
-
+parser.add_argument(
+    "-rs",
+    "--random_seed",
+    type=str,
+    help="Int of random seed",
+    required=False,
+)
 # Initialize google clients
 BQ_CLIENT = bigquery.Client()
 STORAGE_CLIENT = storage.Client()
@@ -82,7 +88,7 @@ ALL = ARGS + ASPS + REQS + STRS
 ALL.extend(["neg_polarity", "pos_polarity"])
 
 
-def summon_reviews(n_reviews):
+def summon_reviews(n_reviews, random_seed):
     """
     Returns a pandas DF containing n sampled eLife reviews
     by summoning reviews from Google BQ.
@@ -95,8 +101,16 @@ def summon_reviews(n_reviews):
     print("Getting data from BQ...")
     df = BQ_CLIENT.query(REVIEW_QRY).result().to_dataframe()
     df = df.dropna()
-    # TODO: sample within score strata
-    return df.sample(n_reviews, random_state=7272)
+   
+    # ensure strata correspond with [1,4]
+    # < 1 and > 4 occur because bert pretrained on ICLR
+    # ensuring strata are in [1,4] also makes 
+    # groups suffuciently sized to sample within
+    # df["rating_hat"] = df['rating_hat'].round()
+    # df["rating_hat"] = df['rating_hat'].replace(5, 4)
+    # df = df.groupby("rating_hat").sample(n_reviews, random_state=random_seed)
+    df = df.sample(n_reviews, random_state=random_seed)
+    return df
 
 
 def _make_identifier(review_id, index):
@@ -231,10 +245,10 @@ def goodbye():
     print("\n" * 3)
 
 
-def main(n_reviews, n_sents, first_time, file_path, validate):
+def main(n_reviews, n_sents, first_time, file_path, validate, random_seed):
     
     # Get data
-    sentences_df = summon_reviews(n_reviews)
+    sentences_df = summon_reviews(n_reviews, random_seed)
     sentences_df = get_sentences_df(sentences_df)
     
     # Begin
@@ -278,5 +292,6 @@ if __name__ == "__main__":
         int(args.n_sents),
         eval(args.first_time.capitalize()),
         args.file_path,
-        eval(args.validate)
+        eval(args.validate),
+        eval(args.random_seed)
     )
