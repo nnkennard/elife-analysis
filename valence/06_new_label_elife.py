@@ -248,7 +248,7 @@ def label_sentences(whole_sentences_df, n_sents, first_time, file_path, width):
             redo = True
             while redo:
                 if pre_sentence_dct["identifier"].endswith("|||0"):
-                    print_whole_review(sentence_dct["review_id"], whole_sentences_df, width)
+                    print_whole_review(pre_sentence_dct["review_id"], whole_sentences_df, width)
 
                 sentence_dct = pre_sentence_dct.to_dict()
                 print_sentence_block(sentences_df, i, sentence_dct, width)
