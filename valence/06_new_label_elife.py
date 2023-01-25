@@ -4,6 +4,7 @@ import glob
 import csv
 import stanza
 import pprint
+import texttable
 from tqdm import tqdm
 from google.cloud import bigquery
 from google.cloud import storage
@@ -37,6 +38,13 @@ parser.add_argument(
     type=int,
     help="random seed",
 )
+parser.add_argument(
+    "-w",
+    "--width",
+    type=int,
+    default=150,
+    help="width of displayed text in chars",
+)
 
 
 parser.add_argument("-ft", "--first_time", action="store_true", help="")
@@ -50,6 +58,8 @@ STORAGE_CLIENT = storage.Client()
 SENTENCIZE_PIPELINE = stanza.Pipeline("en", processors="tokenize")
 
 # DISAPERE Labels
+
+unused = """
 ARGS = [
     "arg_OTHER",
     "arg_EVALUATIVE",
@@ -77,48 +87,78 @@ STRS = ["struc_SUMMARY", "struc_HEADING", "struc_QUOTE"]
 ALL = ARGS + ASPS + REQS + STRS
 
 ALL.extend(["neg_polarity", "pos_polarity"])
+"""
 
 TASKS = "act asp req str pol".split()
 
 
 mini_labels = {
-        'act': "OTH EVL REQ STR SOC".split(),
-        'str': "SUM HDG QUO".split(),
-        'asp': "OTH MOT ORG SND SUB REP MNG CLR".split(),
-        'req': "EDT TYP EXP".split(),
-        'pol': "NEG POS".split()
+    "act": "OTH EVL REQ STR FCT SOC".split(),
+    "str": "DNU SUM HDG QUO".split(),
+    "asp": "OTH MOT ORG SND SUB REP MNG CLR".split(),
+    "req": "DNU EDT TYP EXP".split(),
+    "pol": "DNU NEG POS".split(),
 }
 
+FULL_NAMES = {
+    "OTH": "Other",
+    "EVL": "act_EVALUATIVE",
+    "REQ": "act_REQUEST",
+    "FCT": "act_FACT",
+    "STR": "act_STRUCTURING",
+    "SOC": "act_SOCIAL",
+    "SUM": "struc_SUMMARY",
+    "HDG": "struc_HEADING",
+    "QUO": "struc_QUOTE",
+    "MOT": "asp_MOTIVATION-IMPACT",
+    "ORG": "asp_ORIGINALITY",
+    "SND": "asp_SOUNDNESS-CORRECTNESS",
+    "SUB": "asp_SUBSTANCE",
+    "REP": "asp_REPLICABILITY",
+    "MNG": "asp_MEANINGFUL-COMPARISON",
+    "CLR": "asp_CLARITY",
+    "EDT": "req_EDIT",
+    "TYP": "req_TYPO",
+    "EXP": "req_EXPERIMENT",
+    "NEG": "pol_NEGATIVE",
+    "POS": "pol_POSITIVE",
+}
+
+
 def make_options_line(options):
-    return " | ".join(f'{m}: {i}' for i,m in enumerate(options))
+    return " | ".join(f"{m}: {i}" for i, m in enumerate(options) if not m == "DNU")
 
 
 PROMPTS = {
-"act": "Select action: " + make_options_line(mini_labels['act']),
-"str": "Select structuring type: " + make_options_line(mini_labels['str']),
-"asp": "Select aspect: " + make_options_line(mini_labels['asp']),
-"req": "Select request type: " + make_options_line(mini_labels['req']),
-"pol": "Select polarity: " + make_options_line(mini_labels['pol'])
-        }
+    "act": "Select action: " + make_options_line(mini_labels["act"]),
+    "str": "Select structuring type: " + make_options_line(mini_labels["str"]),
+    "asp": "Select aspect: " + make_options_line(mini_labels["asp"]),
+    "req": "Select request type: " + make_options_line(mini_labels["req"]),
+    "pol": "Select polarity: " + make_options_line(mini_labels["pol"]),
+}
 
 
 def make_line(num_chars):
     print("-" * num_chars)
 
 
-def print_sentence_block(sentences_df, sentence_i, dct):
+def print_sentence_block(sentences_df, sentence_i, dct, width, mini=False):
     # Print Sentence and its identifiers
     print()
-    make_line(100)
-    print(
-        f"SENTENCE {sentence_i + 1} OF {sentences_df.shape[0]} SENTENCES TO RATE IN THIS SESSION"
-    )
-    print(
-        f"M_ID: {dct['manuscript_no']}\tR_ID: {dct['review_id']}\tS_ID: {dct['identifier']}"
-    )
-    make_line(50)
-    pp.pprint(f"{dct['text']}")
-    make_line(100)
+    table_rows = [
+        [
+            f"SENTENCE {sentence_i + 1} OF {sentences_df.shape[0]} SENTENCES TO RATE IN THIS SESSION"
+        ],
+        [
+            f"M_ID: {dct['manuscript_no']}\tR_ID: {dct['review_id']}\tS_ID: {dct['identifier']}"
+        ],
+        [f"\n{dct['text']}"],
+    ]
+    if mini:
+        table_rows = [table_rows[2]]
+    table_obj = texttable.Texttable(width)
+    table_obj.add_rows(table_rows)
+    print(table_obj.draw())
 
 
 def summon_reviews(n_reviews, random_seed=7272):
@@ -175,7 +215,7 @@ def get_input(sentence_dct, category):
                 print(f"[{input_val}] is not a valid input, please try again.")
             elif int_input == 0 and options[0] == "OTH":
                 input_val = input("Write in: ")
-                sentence_dct[category] = f'other_{input_val}'
+                sentence_dct[category] = f"other_{input_val}"
                 return
             else:
                 sentence_dct[category] = options[int_input]
@@ -184,8 +224,18 @@ def get_input(sentence_dct, category):
             print(f"[{input_val}] is not a valid input, please try again.")
 
 
-def label_sentences(sentences_df, n_sents, first_time, file_path):
-    sentences_df = sentences_df.iloc[:n_sents]
+def print_whole_review(review_id, sentences_df, width):
+    table_rows = [["", f"Review: {review_id}"]]
+    for i, row in sentences_df[sentences_df["review_id"] == review_id].iterrows():
+        table_rows.append([row["identifier"].split("|||")[-1], row["text"]])
+    table_obj = texttable.Texttable(width)
+    table_obj.set_chars(["", " ", " ", "-"])
+    table_obj.add_rows(table_rows)
+    print(table_obj.draw())
+
+
+def label_sentences(whole_sentences_df, n_sents, first_time, file_path, width):
+    sentences_df = whole_sentences_df.iloc[:n_sents]
 
     mode = "w" if first_time else "a"
 
@@ -194,31 +244,71 @@ def label_sentences(sentences_df, n_sents, first_time, file_path):
         if first_time:
             writer.writeheader()
 
-        for i, sentence_dct in sentences_df.iterrows():
-            sentence_dct = sentence_dct.to_dict()
-            print_sentence_block(sentences_df, i, sentence_dct)
+        for i, (_, pre_sentence_dct) in enumerate(sentences_df.iterrows()):
+            redo = True
+            while redo:
+                if pre_sentence_dct["identifier"].endswith("|||0"):
+                    print_whole_review(sentence_dct["review_id"], whole_sentences_df, width)
 
-            get_input(sentence_dct, 'act')
-            if sentence_dct['act'] == 'REQ':
-                get_input(sentence_dct, 'req')
-                get_input(sentence_dct, 'asp')
-                sentence_dct['pol'] = "NEG"
+                sentence_dct = pre_sentence_dct.to_dict()
+                print_sentence_block(sentences_df, i, sentence_dct, width)
 
-            elif sentence_dct["act"] == "STR":
-                get_input(sentence_dct, 'str')
+                get_input(sentence_dct, "act")
+                if sentence_dct["act"] == "REQ":
+                    get_input(sentence_dct, "req")
+                    get_input(sentence_dct, "asp")
+                    sentence_dct["pol"] = "NEG"
 
-            elif sentence_dct["act"] == "EVL":
-                get_input(sentence_dct, 'asp')
-                get_input(sentence_dct, 'pol')
+                elif sentence_dct["act"] == "STR":
+                    get_input(sentence_dct, "str")
 
+                elif sentence_dct["act"] == "EVL":
+                    get_input(sentence_dct, "asp")
+                    get_input(sentence_dct, "pol")
+
+                rows = [["Task", "Label"]]
+                for t in TASKS:
+                    val = sentence_dct[t]
+                    if val:
+                        rows.append([t, FULL_NAMES[sentence_dct[t]]])
+                print("Labels for this sentence:")
+                table_obj = texttable.Texttable(width)
+                table_obj.set_chars(["", " ", " ", ""])
+                table_obj.add_rows([[sentence_dct['text']]])
+                print(table_obj.draw())
+                #print("\n"+sentence_dct['text'])
+                table_obj = texttable.Texttable(width)
+                table_obj.set_chars(["", " ", " ", "-"])
+                table_obj.add_rows(rows)
+                print(table_obj.draw())
+
+                valid_redo_input = False
+                while not valid_redo_input:
+                    input_val = input("Would you like to redo? (y/n): ")
+                    if input_val in 'nN':
+                        redo = False
+                        valid_redo_input = True
+                    elif input_val not in 'yY':
+                        valid_redo_input = False
+                    else:
+                        valid_redo_input = True
+                        redo = True
+
+                 
             writer.writerow(sentence_dct)
 
 
 def hello():
-    print("\n" * 3)
-    print("+" * 33)
-    print("START INTERACTIVE SESSION!")
-    print("+" * 33)
+    print(
+        "\n".join(
+            [
+                "\n" * 2,
+                "+" * 33,
+                "START INTERACTIVE SESSION!",
+                "+" * 33,
+            ]
+        )
+    )
 
 
 def goodbye():
@@ -251,21 +341,41 @@ def main():
 
     else:
 
+        # check for current csv
+        # if exists, continue annotating until complete
+
+        # else, annotate next review
+
         # first time means new file
         if args.first_time:
             print(f"{sentences_df.shape[0]} total sentences to label.")
-            label_sentences(sentences_df, args.n_sents, args.first_time, args.file_path)
+            label_sentences(
+                sentences_df, args.n_sents, args.first_time, args.file_path, args.width
+            )
 
         # nth time means append file, and make sure only unrated reviews are printed
         else:
+
             # open existing rated reviews file
-            rater_df = pd.read_csv(file_path)
+            rater_df = pd.read_csv(args.file_path)
             already_reviewed = list(rater_df["identifier"])
-            sentences_df = sentences_df[
+            truncated_sentences_df = sentences_df[
                 ~sentences_df["identifier"].isin(already_reviewed)
             ]
             print(f"{sentences_df.shape[0]} sentences left to label.")
-            label_sentences(sentences_df, args.n_sents, args.first_time, args.file_path)
+            if not truncated_sentences_df.iloc[0]["identifier"].endswith("|||0"):
+                print_whole_review(
+                    truncated_sentences_df.iloc[0]["review_id"],
+                    sentences_df,
+                    args.width,
+                )
+            label_sentences(
+                truncated_sentences_df,
+                args.n_sents,
+                args.first_time,
+                args.file_path,
+                args.width,
+            )
 
     # End
     goodbye()
