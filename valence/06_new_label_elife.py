@@ -270,7 +270,7 @@ def label_sentences(whole_sentences_df, n_sents, first_time, file_path, width):
                 for t in TASKS:
                     val = sentence_dct[t]
                     if val:
-                        rows.append([t, FULL_NAMES[sentence_dct[t]]])
+                        rows.append([t, FULL_NAMES.get(sentence_dct[t], sentence_dct[t])])
                 print("Labels for this sentence:")
                 table_obj = texttable.Texttable(width)
                 table_obj.set_chars(["", " ", " ", ""])
