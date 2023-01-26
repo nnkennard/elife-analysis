@@ -96,7 +96,7 @@ mini_labels = {
     "act": "OTH EVL REQ STR FCT SOC".split(),
     "str": "DNU SUM HDG QUO".split(),
     "asp": "OTH MOT ORG SND SUB REP MNG CLR".split(),
-    "req": "DNU EDT TYP EXP".split(),
+    "req": "OTH EDT TYP EXP".split(),
     "pol": "DNU NEG POS".split(),
 }
 
@@ -271,8 +271,8 @@ def label_sentences(whole_sentences_df, n_sents, first_time, file_path, width):
                     get_input(sentence_dct, "str")
 
                 elif sentence_dct["act"] == "EVL":
-                    get_input(sentence_dct, "asp")
                     get_input(sentence_dct, "pol")
+                    get_input(sentence_dct, "asp")
 
                 rows = [["Task", "Label"]]
                 for t in TASKS:
@@ -370,7 +370,7 @@ def main():
             truncated_sentences_df = sentences_df[
                 ~sentences_df["identifier"].isin(already_reviewed)
             ]
-            print(f"{sentences_df.shape[0]} sentences left to label.")
+            print(f"{truncated_sentences_df.shape[0]} sentences left to label.")
             if not truncated_sentences_df.iloc[0]["identifier"].endswith("|||0"):
                 print_whole_review(
                     truncated_sentences_df.iloc[0]["review_id"],
