@@ -57,43 +57,11 @@ STORAGE_CLIENT = storage.Client()
 # Initialize stanza pipeline
 SENTENCIZE_PIPELINE = stanza.Pipeline("en", processors="tokenize")
 
-# DISAPERE Labels
-
-unused = """
-ARGS = [
-    "arg_OTHER",
-    "arg_EVALUATIVE",
-    "arg_REQUEST",
-    "arg_FACT",
-    "arg_STRUCTURING",
-    "arg_SOCIAL",
-]
-
-ASPS = [
-    "asp_MOTIVATION-IMPACT",
-    "asp_ORIGINALITY",
-    "asp_SOUNDNESS-CORRECTNESS",
-    "asp_SUBSTANCE",
-    "asp_REPLICABILITY",
-    "asp_MEANINGFUL-COMPARISON",
-    "asp_CLARITY",
-    "asp_OTHER",
-]
-
-REQS = ["req_EDIT", "req_TYPO", "req_EXPERIMENT"]
-
-STRS = ["struc_SUMMARY", "struc_HEADING", "struc_QUOTE"]
-
-ALL = ARGS + ASPS + REQS + STRS
-
-ALL.extend(["neg_polarity", "pos_polarity"])
-"""
-
 TASKS = "act asp req str pol".split()
 
 
 mini_labels = {
-    "act": "OTH EVL REQ STR FCT SOC".split(),
+    "act": "OTH EVL REQ STR FCT HYP SOC".split(),
     "str": "DNU SUM HDG QUO".split(),
     "asp": "OTH MOT ORG SND SUB REP MNG CLR".split(),
     "req": "OTH EDT TYP EXP".split(),
@@ -102,10 +70,11 @@ mini_labels = {
 
 FULL_NAMES = {
     "OTH": "Other",
-    "EVL": "act_EVALUATIVE",
+    "EVL": "act_EVALUATE",
     "REQ": "act_REQUEST",
     "FCT": "act_FACT",
     "STR": "act_STRUCTURING",
+    "HYP": "act_HYPOTHESIZE",
     "SOC": "act_SOCIAL",
     "SUM": "struc_SUMMARY",
     "HDG": "struc_HEADING",
@@ -174,10 +143,10 @@ def summon_reviews(n_reviews, random_seed=7272):
     print("Getting data from BQ...")
     df = BQ_CLIENT.query(REVIEW_QRY).result().to_dataframe()
     df = df.dropna()
-    
+
     # ensure strata correspond with [1,4]
     # < 1 and > 4 occur because bert pretrained on ICLR
-    # ensuring strata are in [1,4] also makes 
+    # ensuring strata are in [1,4] also makes
     # groups suffuciently sized to sample within
     # df["rating_hat"] = df['rating_hat'].round()
     # df["rating_hat"] = df['rating_hat'].replace(5, 4)
@@ -256,7 +225,9 @@ def label_sentences(whole_sentences_df, n_sents, first_time, file_path, width):
             redo = True
             while redo:
                 if pre_sentence_dct["identifier"].endswith("|||0"):
-                    print_whole_review(pre_sentence_dct["review_id"], whole_sentences_df, width)
+                    print_whole_review(
+                        pre_sentence_dct["review_id"], whole_sentences_df, width
+                    )
 
                 sentence_dct = pre_sentence_dct.to_dict()
                 print_sentence_block(sentences_df, i, sentence_dct, width)
@@ -278,13 +249,15 @@ def label_sentences(whole_sentences_df, n_sents, first_time, file_path, width):
                 for t in TASKS:
                     val = sentence_dct[t]
                     if val:
-                        rows.append([t, FULL_NAMES.get(sentence_dct[t], sentence_dct[t])])
+                        rows.append(
+                            [t, FULL_NAMES.get(sentence_dct[t], sentence_dct[t])]
+                        )
                 print("Labels for this sentence:")
                 table_obj = texttable.Texttable(width)
                 table_obj.set_chars(["", " ", " ", ""])
-                table_obj.add_rows([[sentence_dct['text']]])
+                table_obj.add_rows([[sentence_dct["text"]]])
                 print(table_obj.draw())
-                #print("\n"+sentence_dct['text'])
+                # print("\n"+sentence_dct['text'])
                 table_obj = texttable.Texttable(width)
                 table_obj.set_chars(["", " ", " ", "-"])
                 table_obj.add_rows(rows)
@@ -293,16 +266,15 @@ def label_sentences(whole_sentences_df, n_sents, first_time, file_path, width):
                 valid_redo_input = False
                 while not valid_redo_input:
                     input_val = input("Would you like to redo? (y/n): ")
-                    if input_val in 'nN':
+                    if input_val in "nN":
                         redo = False
                         valid_redo_input = True
-                    elif input_val not in 'yY':
+                    elif input_val not in "yY":
                         valid_redo_input = False
                     else:
                         valid_redo_input = True
                         redo = True
 
-                 
             writer.writerow(sentence_dct)
 
 
