@@ -148,9 +148,9 @@ def summon_reviews(n_reviews, random_seed=7272):
     # < 1 and > 4 occur because bert pretrained on ICLR
     # ensuring strata are in [1,4] also makes
     # groups suffuciently sized to sample within
-    # df["rating_hat"] = df['rating_hat'].round()
-    # df["rating_hat"] = df['rating_hat'].replace(5, 4)
-    # df = df.groupby("rating_hat").sample(n_reviews, random_state=random_seed)
+    df["rating_hat"] = df['rating_hat'].round()
+    df["rating_hat"] = df['rating_hat'].replace(5, 4)
+    df = df.groupby("rating_hat").sample(n_reviews, random_state=random_seed)
 
     return df.sample(n_reviews, random_state=random_seed)
 
@@ -252,9 +252,9 @@ def label_sentences(whole_sentences_df, n_sents, first_time, file_path, width):
                         rows.append(
                             [t, FULL_NAMES.get(sentence_dct[t], sentence_dct[t])]
                         )
-                print("Labels for this sentence:")
+                print("\n\nLabels for this sentence:")
                 table_obj = texttable.Texttable(width)
-                table_obj.set_chars(["", " ", " ", ""])
+                table_obj.set_chars([" ", " ", " ", "-"]).set_header_align(['l'])
                 table_obj.add_rows([[sentence_dct["text"]]])
                 print(table_obj.draw())
                 # print("\n"+sentence_dct['text'])
@@ -314,9 +314,12 @@ def main():
     if args.validate:
         flags = input("Enter sentence ids: ").split(",")
         for flag in flags:
-            sent = sentences_df[sentences_df["identifier"] == flag]["text"].iloc[0]
-            pp.pprint(sent)
-            print()
+            table_obj = texttable.Texttable(args.width)
+            table_obj.set_chars([" ", " ", " ", "-"]).set_header_align(['l'])
+            table_obj.add_rows([[
+                sentences_df[sentences_df["identifier"] == flag]["text"].iloc[0]
+                ]])
+            print(table_obj.draw())
             advance = eval(input("Advance?: "))
 
     else:
