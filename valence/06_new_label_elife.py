@@ -306,7 +306,7 @@ def goodbye():
 
 
 def get_file_path(args):
-    return f"{args.output_dir}/values_annotation_{args.annotator}_rs_{args.random_seed}_nr_{args.n_reviews}.csv"
+    return f"{args.output_dir}/values_annotation_{args.annotator}_rs_{args.random_seed}.csv"
 
 
 def main():
