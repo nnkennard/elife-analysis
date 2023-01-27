@@ -15,10 +15,16 @@ pp = pprint.PrettyPrinter(width=100, compact=True)
 
 parser = argparse.ArgumentParser(description="Create examples for WS training")
 parser.add_argument(
-    "-fp",
-    "--file_path",
+    "-o",
+    "--output_dir",
     type=str,
-    help="full file path to save labels",
+    help="output directory to save labels",
+)
+parser.add_argument(
+    "-a",
+    "--annotator",
+    type=str,
+    help="annotator initials",
 )
 parser.add_argument(
     "-nr",
@@ -148,8 +154,8 @@ def summon_reviews(n_reviews, random_seed=7272):
     # < 1 and > 4 occur because bert pretrained on ICLR
     # ensuring strata are in [1,4] also makes
     # groups suffuciently sized to sample within
-    df["rating_hat"] = df['rating_hat'].round()
-    df["rating_hat"] = df['rating_hat'].replace(5, 4)
+    df["rating_hat"] = df["rating_hat"].round()
+    df["rating_hat"] = df["rating_hat"].replace(5, 4)
     df = df.groupby("rating_hat").sample(n_reviews, random_state=random_seed)
 
     return df.sample(n_reviews, random_state=random_seed)
@@ -254,7 +260,7 @@ def label_sentences(whole_sentences_df, n_sents, first_time, file_path, width):
                         )
                 print("\n\nLabels for this sentence:")
                 table_obj = texttable.Texttable(width)
-                table_obj.set_chars([" ", " ", " ", "-"]).set_header_align(['l'])
+                table_obj.set_chars([" ", " ", " ", "-"]).set_header_align(["l"])
                 table_obj.add_rows([[sentence_dct["text"]]])
                 print(table_obj.draw())
                 # print("\n"+sentence_dct['text'])
@@ -299,9 +305,15 @@ def goodbye():
     print("\n" * 3)
 
 
+def get_file_path(args):
+    return f"{args.output_dir}/values_annotation_{args.annotator}_rs_{args.random_seed}_nr_{args.n_reviews}.csv"
+
+
 def main():
 
     args = parser.parse_args()
+
+    file_path = get_file_path(args)
     # Get data
     sentences_df = summon_reviews(args.n_reviews, args.random_seed)
     sentences_df = get_sentences_df(sentences_df)
@@ -315,32 +327,27 @@ def main():
         flags = input("Enter sentence ids: ").split(",")
         for flag in flags:
             table_obj = texttable.Texttable(args.width)
-            table_obj.set_chars([" ", " ", " ", "-"]).set_header_align(['l'])
-            table_obj.add_rows([[
-                sentences_df[sentences_df["identifier"] == flag]["text"].iloc[0]
-                ]])
+            table_obj.set_chars([" ", " ", " ", "-"]).set_header_align(["l"])
+            table_obj.add_rows(
+                [[sentences_df[sentences_df["identifier"] == flag]["text"].iloc[0]]]
+            )
             print(table_obj.draw())
             advance = eval(input("Advance?: "))
 
     else:
 
-        # check for current csv
-        # if exists, continue annotating until complete
-
-        # else, annotate next review
-
         # first time means new file
         if args.first_time:
             print(f"{sentences_df.shape[0]} total sentences to label.")
             label_sentences(
-                sentences_df, args.n_sents, args.first_time, args.file_path, args.width
+                sentences_df, args.n_sents, args.first_time, file_path, args.width
             )
 
         # nth time means append file, and make sure only unrated reviews are printed
         else:
 
             # open existing rated reviews file
-            rater_df = pd.read_csv(args.file_path)
+            rater_df = pd.read_csv(file_path)
             already_reviewed = list(rater_df["identifier"])
             truncated_sentences_df = sentences_df[
                 ~sentences_df["identifier"].isin(already_reviewed)
@@ -356,7 +363,7 @@ def main():
                 truncated_sentences_df,
                 args.n_sents,
                 args.first_time,
-                args.file_path,
+                file_path,
                 args.width,
             )
 
