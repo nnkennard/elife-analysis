@@ -157,8 +157,7 @@ def summon_reviews(n_reviews, random_seed=7272):
     df["rating_hat"] = df["rating_hat"].round()
     df["rating_hat"] = df["rating_hat"].replace(5, 4)
     df = df.groupby("rating_hat").sample(n_reviews, random_state=random_seed)
-
-    return df.sample(n_reviews, random_state=random_seed)
+    return df
 
 
 def _make_identifier(review_id, index):
