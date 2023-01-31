@@ -46,7 +46,7 @@ def get_review_threads(discussion_notes):
             reviews.append(
                 (note.signatures[0], get_longest_thread(note, discussion_notes))
             )
-    return [x[1] for x in sorted(reviews)]
+    return [x[1] for x in sorted(reviews, key=lambda x:(x[0], x[1][0].id))]
 
 
 def get_review_data(discussion_notes, metadata):
