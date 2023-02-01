@@ -1,0 +1,52 @@
+{"double1": {
+	"nnk": "/home/nayakne_stanford_edu/my_labels.csv",
+	"dss":"/home/jupyter/00_daniel/00_reviews/00_data/smith_labels.csv",
+	"meta": {
+		"subset": "dev",
+		"format": "format0"
+	}
+},
+"double2": {
+	"nnk":"/home/nayakne_stanford_edu/nnk_230115.csv",
+	"dss":"/home/jupyter/00_daniel/00_reviews/00_data/elife100.csv",
+	"meta": {
+		"subset": "dev",
+		"format": "format0"
+	}
+},
+"double3": {
+	"nnk":"/home/nayakne_stanford_edu/nnk_230120.csv",
+	"dss":"/home/jupyter/00_daniel/dss_230121.csv",
+	"meta": {
+		"subset": "test",
+		"format": "format0"
+	}
+},
+"double4": {
+	"nnk":"/home/nayakne_stanford_edu/nnk_230125.csv",
+	"dss":"/home/jupyter/00_daniel/dss_230125.csv",
+	"meta": {
+		"subset": "test",
+		"format": "format1"
+	}
+},
+"double5": {
+	"nnk":"/home/nayakne_stanford_edu/values_annotation_nnk_rs_3.csv",
+	"dss":"/home/jupyter/00_daniel/elife-analysis/values_annotation_dss_rs_3.csv",
+	"meta": {
+		"subset": "test",
+		"format": "format1"
+	}
+},
+"single1": {
+	"dss":"/home/jupyter/00_daniel/elife-analysis/values_annotation_dss_rs_72727272.csv",
+	"meta": {
+		"subset": "train",
+		"format": "format1"
+	}
+}
+
+
+
+
+}

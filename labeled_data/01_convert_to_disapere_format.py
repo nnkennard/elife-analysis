@@ -1,6 +1,7 @@
 import collections
 import csv
 import glob
+import json
 import sys
 
 
@@ -30,40 +31,43 @@ INDICATOR_CONVERTER = {
 }
 
 VALUE_CONVERTER = {
-        "CLR": "asp_clarity",
-        "EDT": "arg-request_edit",
-        "EVL": "arg_evaluative",
-        "EXP": "arg-request_experiment",
-        "FCT": "arg_fact",
-        "HDG": "arg-structuring_heading",
-        "HYP": "arg_other",
-        "MOT": "asp_motivation-impact",
-        "NEG": "pol_negative",
-        "ORG": "asp_originality",
-        "POS": "pol_positive",
-        "REQ": "arg_request",
-        "SND": "asp_soundness-correctness",
-        "SOC": "arg_social",
-        "STR": "arg_structuring",
-        "SUB": "asp_substance",
-        "SUM": "arg-structuring_summary",
-        "TYP": "arg-request_typo",
-        }
+    "CLR": "asp_clarity",
+    "EDT": "arg-request_edit",
+    "EVL": "arg_evaluative",
+    "EXP": "arg-request_experiment",
+    "FCT": "arg_fact",
+    "HDG": "arg-structuring_heading",
+    "HYP": "arg_other",
+    "MOT": "asp_motivation-impact",
+    "MNG": "asp_meaningful-comparison",
+    "NEG": "pol_negative",
+    "ORG": "asp_originality",
+    "POS": "pol_positive",
+    "QUO": "arg-structuring_quote",
+    "REP": "asp_replicability",
+    "REQ": "arg_request",
+    "SND": "asp_soundness-correctness",
+    "SOC": "arg_social",
+    "STR": "arg_structuring",
+    "SUB": "asp_substance",
+    "SUM": "arg-structuring_summary",
+    "TYP": "arg-request_typo",
+}
 
-KEY_CONVERTER  ={
-        "act": "review_action",
-        "asp": "aspect",
-        "pol": "polarity",
-        "req": "fine_review_action",
-        "str": "fine_review_action",
+KEY_CONVERTER = {
+    "act": "review_action",
+    "asp": "aspect",
+    "pol": "polarity",
+    "req": "fine_review_action",
+    "str": "fine_review_action",
+}
 
-        }
 
 def get_labels_old_format(review_sentence_row):
     labels = {}
     for k, v in review_sentence_row.items():
         if k not in ["manuscript_no", "review_id", "identifier", "text"]:
-            if v in ["", 'interpret', '.', 'intention', "'"]:
+            if v in ["", "interpret", ".", "intention", "'"]:
                 if k == "arg_other":
                     labels["review_action"] = "arg_other"
                 if k == "asp_other":
@@ -73,24 +77,39 @@ def get_labels_old_format(review_sentence_row):
                 labels.update(dict([INDICATOR_CONVERTER[k]]))
     return labels
 
+
 def get_labels_new_format(review_sentence_row):
     labels = {}
     for k, v in review_sentence_row.items():
         if k not in ["manuscript_no", "review_id", "identifier", "text"]:
-            if v == '0':
+            if v == "0":
                 continue
-            elif v in ["other_tok_error", "other_interpret", "other_intepret", "other_other"]:
-                assert k == 'act'
+            elif v in [
+                "other_tok_error",
+                "other_interpret",
+                "other_intepret",
+                "other_other",
+                "other_typo",
+                "other_defer",
+                "other_1",
+                "other_?",
+                'other_summary_review_round1',
+                "other_back-pedaling ",
+            ]:
+                assert k == "act"
                 labels["review_action"] = "arg_other"
-            elif v in ["other_0"]:
-                assert k == 'req'
-                labels["fine_review_action"] = "arg-request_explanation"
-            elif v in ['other_manuscript']:
-                assert k == 'asp'
-                labels['aspect'] = "none"
-            else:    
+            elif v in ["other_0", "other_rebuttal", "other_"]:
+                if k == "req":
+                    labels["fine_review_action"] = "arg-request_explanation"
+                elif k == "asp":
+                    labels["asp"] = "asp_other"
+            elif v in ["other_manuscript", "other_ms"]:
+                assert k == "asp"
+                labels["aspect"] = "none"
+            else:
                 labels[KEY_CONVERTER[k]] = VALUE_CONVERTER[v]
     return labels
+
 
 def compile_file(reader, annotator, data_format):
     review_objs = []
@@ -101,9 +120,9 @@ def compile_file(reader, annotator, data_format):
     for review, rows in by_review.items():
         top_row = rows[0]
         metadata = {
-            "review_id": row["review_id"],
-            "forum_id": row["manuscript_no"],
-            "reviewer": "Reviewer" + row["review_id"].split("_")[1],
+            "review_id": top_row["review_id"],
+            "forum_id": top_row["manuscript_no"],
+            "reviewer": "Reviewer" + top_row["review_id"].split("_")[1],
             "annotator": annotator,
         }
         review_sentences = []
@@ -124,28 +143,26 @@ def compile_file(reader, annotator, data_format):
             else:
                 assert data_format == "format1"
                 empty_sentence.update(get_labels_new_format(review_sentence_row))
-        review_objs.append({
-            "metadata": metadata,
-            "review_sentences": review_sentences
-            })
+        review_objs.append({"metadata": metadata, "review_sentences": review_sentences})
     return review_objs
-            
-def compile_new_format(reader, annotator):
-    pass
 
 
 def main():
-    import_dir = sys.argv[1]
+    input_dir, output_dir = sys.argv[1:]
 
-    review_objs = []
-    for filename in glob.glob(f"{import_dir}/*dss*format*"):
-        source_file, annotator, data_format = (
-            filename.split("/")[-1].split(".")[0].split("_")
-        )
-        with open(filename, "r") as f:
-            reader = csv.DictReader(f)
-            review_objs += compile_file(reader, annotator, data_format)
-        print(len(review_objs))
+    for subset in "train dev test".split():
+        review_objs = []
+        for filename in glob.glob(f"{input_dir}/{subset}/*dss*format*"):
+            source_file, annotator, data_format = (
+                filename.split("/")[-1].split(".")[0].split("_")
+            )
+            with open(filename, "r") as f:
+                reader = csv.DictReader(f)
+                review_objs += compile_file(reader, annotator, data_format)
+        for review in review_objs:
+            with open(f'{output_dir}/{subset}/{review["metadata"]["review_id"]}.json', 'w') as f:
+                json.dump(review, f)
+
 
 if __name__ == "__main__":
     main()
