@@ -24,6 +24,12 @@ parser.add_argument(
     type=str,
     help="path to overall data directory",
 )
+parser.add_argument(
+    "-e",
+    "--expt_name",
+    type=str,
+    help="name for the experiment",
+)
 
 parser.add_argument(
     "-t",
@@ -40,15 +46,17 @@ parser.add_argument(
 )
 
 
-def do_predict(tokenizer, model, task_dir, input_file, task, labels):
+def do_predict(tokenizer, model, task_dir, input_file, task, labels, expt_name):
 
     model.load_state_dict(torch.load(f"{task_dir}/ckpt/best_bert_model.bin"))
 
     predictions = {}
 
     with open(input_file, "r") as f:
-        with open(input_file.replace(".jsonl", f"_{task}_predictions.jsonl"), "w") as g:
-            for line in tqdm(f):
+        with open(input_file.replace(".jsonl", f"_{task}_{expt_name}_predictions.jsonl"), "w") as g:
+            for i, line in tqdm(enumerate(f)):
+                if i == 100000:
+                    break
                 example = json.loads(line)
                 encoded_review = classification_lib.tokenizer_fn(
                     tokenizer, example["text"]
@@ -72,7 +80,7 @@ def main():
 
     task_dir = classification_lib.make_checkpoint_path(args.data_dir, args.task)
 
-    do_predict(tokenizer, model, task_dir, args.input_file, args.task, labels)
+    do_predict(tokenizer, model, task_dir, args.input_file, args.task, labels, args.expt_name)
 
 
 if __name__ == "__main__":
