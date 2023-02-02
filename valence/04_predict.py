@@ -55,8 +55,6 @@ def do_predict(tokenizer, model, task_dir, input_file, task, labels, expt_name):
     with open(input_file, "r") as f:
         with open(input_file.replace(".jsonl", f"_{task}_{expt_name}_predictions.jsonl"), "w") as g:
             for i, line in tqdm(enumerate(f)):
-                if i == 100000:
-                    break
                 example = json.loads(line)
                 encoded_review = classification_lib.tokenizer_fn(
                     tokenizer, example["text"]
