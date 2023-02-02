@@ -44,7 +44,9 @@ def get_review_threads(discussion_notes):
     for note in discussion_notes:
         if note.replyto == note.forum and "review" in note.content:
             reviews.append(
-                (note.signatures[0], get_longest_thread(note, discussion_notes))
+                (
+                note.signatures[0],
+                get_longest_thread(note, discussion_notes))
             )
     return [x[1] for x in sorted(reviews, key=lambda x:(x[0], x[1][0].id))]
 
@@ -58,6 +60,7 @@ def get_review_data(discussion_notes, metadata):
             {
                 "identifier": f"{thread[0].forum}___{i}",
                 "reviewer": thread[0].signatures[0].split("/")[-1],
+                "rating": int(thread[0].content['rating'].split(':')[0]),
                 "text": "\n\n".join(
                     [n.content.get("review", n.content.get("comment")) for n in thread]
                 ),
