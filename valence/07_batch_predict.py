@@ -6,7 +6,7 @@ import random
 import torch
 import torch.nn as nn
 import transformers
-from tqdm import tqdm
+import tqdm
 from contextlib import nullcontext
 from torch.optim import AdamW
 from transformers import BertTokenizer
@@ -16,8 +16,8 @@ import classification_lib
 DEVICE = "cuda"
 
 seed = 34
-random.seed(seed)
 torch.manual_seed(seed)
+random.seed(seed)
 torch.cuda.manual_seed(seed)
 torch.cuda.manual_seed_all(seed)
 torch.backends.cudnn.deterministic=True
@@ -52,26 +52,41 @@ parser.add_argument(
     help="preprocessed eLife file",
 )
 
+BATCH_SIZE = 4
+
+predict_tokenizer_fn = lambda tok, texts: tok.batch_encode_plus(
+    texts,
+    add_special_tokens=True,
+    return_token_type_ids=False,
+    padding="max_length",
+    max_length=512,
+    truncation=True,
+    return_attention_mask=True,
+    return_tensors="pt",
+)
+
 
 def do_predict(tokenizer, model, task_dir, input_file, task, labels, expt_name):
 
     model.load_state_dict(torch.load(f"{task_dir}/ckpt/best_bert_model.bin"))
 
-    predictions = {}
-
     with open(input_file, "r") as f:
-        with open(input_file.replace(".jsonl", f"_{task}_{expt_name}_predictions.jsonl"), "w") as g:
-            for i, line in tqdm(enumerate(f)):
-                example = json.loads(line)
-                encoded_review = classification_lib.tokenizer_fn(
-                    tokenizer, example["text"]
-                )
-                input_ids = encoded_review["input_ids"].to(DEVICE)
-                attention_mask = encoded_review["attention_mask"].to(DEVICE)
-                output = model(input_ids, attention_mask)
-                _, prediction = torch.max(output, dim=1)
-                example["prediction"] = labels[prediction.item()]
-                g.write(json.dumps(example) + "\n")
+        examples = [json.loads(line) for line in f]
+        predictions = []
+        for i in tqdm.tqdm(range(0, len(examples), BATCH_SIZE)):
+            batch = [e["text"] for e in examples[i : i + BATCH_SIZE]]
+            encoded_review = predict_tokenizer_fn(tokenizer, batch)
+            input_ids = encoded_review["input_ids"].to(DEVICE)
+            attention_mask = encoded_review["attention_mask"].to(DEVICE)
+            output = model(input_ids, attention_mask)
+            _, batch_predictions = torch.max(output, dim=1)
+            predictions += batch_predictions
+    for example, prediction in zip(examples, predictions):
+        example["prediction"] = labels[prediction.item()]
+    with open(
+        input_file.replace(".jsonl", f"_{task}_{expt_name}_predictions.jsonl"), "w"
+    ) as g:
+        g.write("\n".join(json.dumps(e) for e in examples))
 
 
 def main():
@@ -85,7 +100,9 @@ def main():
 
     task_dir = classification_lib.make_checkpoint_path(args.data_dir, args.task)
 
-    do_predict(tokenizer, model, task_dir, args.input_file, args.task, labels, args.expt_name)
+    do_predict(
+        tokenizer, model, task_dir, args.input_file, args.task, labels, args.expt_name
+    )
 
 
 if __name__ == "__main__":
