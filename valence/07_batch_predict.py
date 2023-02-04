@@ -52,14 +52,14 @@ parser.add_argument(
     help="preprocessed eLife file",
 )
 
-BATCH_SIZE = 4
+BATCH_SIZE = 128
 
 predict_tokenizer_fn = lambda tok, texts: tok.batch_encode_plus(
     texts,
     add_special_tokens=True,
     return_token_type_ids=False,
     padding="max_length",
-    max_length=512,
+    max_length=128,
     truncation=True,
     return_attention_mask=True,
     return_tensors="pt",
