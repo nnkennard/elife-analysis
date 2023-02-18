@@ -28,7 +28,7 @@ labels:
   pol:
   - pos
   - neg
-  - neu
+  - non
   asp:
   - sbs
   - clr
