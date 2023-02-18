@@ -1,0 +1,12 @@
+config_name: A1
+task: epistemic
+model_name: bert_base_uncased
+schema_path: ../schema.yml
+cv: true
+train:
+   - disapere
+dev:
+   - disapere
+test:
+   - disapere
+predict: []
