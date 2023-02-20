@@ -16,6 +16,7 @@ import random
 random.seed(seed)
 torch.cuda.manual_seed_all(seed)
 os.environ['PYTHONHASHSEED'] = str(seed)
+import numpy as np
 np.random.seed(seed)
 
 
