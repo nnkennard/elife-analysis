@@ -16,11 +16,5 @@ mkdir -p data/raw/disapere
 mv DISAPERE/final_dataset/* data/raw/disapere/
 rm -r DISAPERE*
 
-# ReviewAdvisor (has to be scp-ed)
-#mkdir -p data/raw/revadv
-# scp -i ~/.ssh/id_nnk_courbet -r ~/Downloads/dataset-2/aspect_data nnayak_umass_edu@unity.rc.umass.edu:/work/nnayak_umass_edu/elife-analysis/who_wins/data/raw/revadv 
-unzip data/raw/revadv/review_with_aspect.jsonl.zip
-mv review_with_aspect.jsonl data/raw/revadv/
-
-
-# Convert data format
+# ReviewAdvisor
+# Just added this data to the repo

@@ -1,5 +1,5 @@
-config_name: A1
-task: epi
+config_name: D1
+task: asp
 model_name: bert-base-uncased
 cv: true
 train:
@@ -8,4 +8,5 @@ dev:
    - disapere
 test:
    - disapere
-predict: []
+predict:
+   - iclr

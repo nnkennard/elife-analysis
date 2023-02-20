@@ -1,9 +1,10 @@
-config_name: A1
+config_name: A2
 task: epi
 model_name: bert-base-uncased
 cv: true
 train:
    - disapere
+   - ampere
 dev:
    - disapere
 test:

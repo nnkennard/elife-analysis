@@ -7,8 +7,13 @@ import json
 import os
 import stanza
 
+import iclr_lib
+
 parser = argparse.ArgumentParser(description="")
 parser.add_argument("-d", "--data_dir", default="", type=str, help="")
+
+
+# ==== DISAPERE
 
 disapere_pol_map = {"none": "non", "pol_negative": "neg", "pol_positive": "pos"}
 
@@ -47,17 +52,21 @@ def preprocess_disapere(data_dir):
                 identifier_prefix = f"disapere|{subset}|{review_id}|"
                 for sent in obj["review_sentences"]:
                     for task, label in get_disapere_labels(sent).items():
-                        lines[task].append({
-                        "identifier": f'{identifier_prefix}{sent["sentence_index"]}',
-                        "text": sent["text"],
-                        'label': label
-                        })
+                        lines[task].append(
+                            {
+                                "identifier": f'{identifier_prefix}{sent["sentence_index"]}',
+                                "text": sent["text"],
+                                "label": label,
+                            }
+                        )
         for task, examples in lines.items():
             output_dir = f"{data_dir}/labeled/{task}/{subset}/"
             os.makedirs(output_dir, exist_ok=True)
             with open(f"{output_dir}/disapere.jsonl", "w") as f:
                 f.write("\n".join(json.dumps(e) for e in examples))
 
+
+# ==== AMPERE
 
 ampere_epi_map = {
     "non-arg": "nep",
@@ -89,6 +98,8 @@ def preprocess_ampere(data_dir):
     with open(f"{data_dir}/labeled/epi/train/ampere.jsonl", "w") as f:
         f.write("\n".join(json.dumps(e) for e in examples))
 
+
+# ==== ReviewAdvisor
 
 SENTENCIZE_PIPELINE = stanza.Pipeline("en", processors="tokenize")
 TOLERANCE = 7
@@ -142,48 +153,72 @@ def preprocess_revadv(data_dir):
     with gzip.open(f"{data_dir}/raw/revadv/review_with_aspect.jsonl.gz", "r") as f:
         lines = collections.defaultdict(list)
         for line in f:
-          obj = json.loads(line)
-          identifier_prefix = f'revadv|train|{obj["id"]}|'
-          sentences = tokenize(obj["text"])
-          revadv_labels = label_sentences(sentences, obj["labels"])
-          converted_labels = {}
-          for i, (sentence, label_list) in enumerate(zip(sentences, revadv_labels)):
-            if not label_list or 'summary' in label_list:
-              converted_labels = {
-              'epi': 'nep',
-              "pol": 'non',
-              'asp':'non'
-              }
-            else:
-              converted_labels['epi'] = 'epi'
-              asp, pol = label_list[0].rsplit('_', 1)
-              converted_labels = {
-                'epi': 'epi',
-                'pol': revadv_label_map[pol],
-                'asp': revadv_label_map[asp],
-              }
-              for task, label in converted_labels.items():
-                lines[task].append({
-                "identifier": f'{identifier_prefix}{i}',
-                "text": sentence.text,
-                "label": label
-                })
+            obj = json.loads(line)
+            identifier_prefix = f'revadv|train|{obj["id"]}|'
+            sentences = tokenize(obj["text"])
+            revadv_labels = label_sentences(sentences, obj["labels"])
+            converted_labels = {}
+            for i, (sentence, label_list) in enumerate(zip(sentences, revadv_labels)):
+                if not label_list or "summary" in label_list:
+                    converted_labels = {"epi": "nep", "pol": "non", "asp": "non"}
+                else:
+                    converted_labels["epi"] = "epi"
+                    asp, pol = label_list[0].rsplit("_", 1)
+                    converted_labels = {
+                        "epi": "epi",
+                        "pol": revadv_label_map[pol],
+                        "asp": revadv_label_map[asp],
+                    }
+                    for task, label in converted_labels.items():
+                        lines[task].append(
+                            {
+                                "identifier": f"{identifier_prefix}{i}",
+                                "text": sentence.text,
+                                "label": label,
+                            }
+                        )
     for task, examples in lines.items():
-      with open(f'{data_dir}/labeled/{task}/train/revadv.jsonl', 'w') as f:
-        f.write("\n".join(json.dumps(e) for e in examples))
+        with open(f"{data_dir}/labeled/{task}/train/revadv.jsonl", "w") as f:
+            f.write("\n".join(json.dumps(e) for e in examples))
+
+
+def prepare_unlabeled_iclr_data(data_dir):
+    lines = collections.defaultdict(list)
+    for filename in glob.glob(f"{data_dir}/raw/iclr/*.json"):
+        with open(filename, "r") as f:
+            obj = json.load(f)
+            review_id = obj["identifier"]
+            identifier_prefix = f"iclr|predict|{review_id}|"
+            for i, sent in enumerate(tokenize(obj["text"])):
+                for task in "epi pol asp".split():
+                    lines[task].append(
+                        {
+                            "identifier": f"{identifier_prefix}{i}",
+                            "text": sent.text,
+                            "label": None,
+                        }
+                    )
+    for task, examples in lines.items():
+        output_dir = f"{data_dir}/unlabeled/{task}/predict/"
+        os.makedirs(output_dir, exist_ok=True)
+        with open(f"{output_dir}/iclr.jsonl", "w") as f:
+            f.write("\n".join(json.dumps(e) for e in examples))
 
 
 def main():
 
     args = parser.parse_args()
-  
-    print("Preprocessing DISAPERE")
-    preprocess_disapere(args.data_dir)
-    print("Preprocessing AMPERE")
-    preprocess_ampere(args.data_dir)
-    print("Preprocessing ReviewAdvisor")
-    preprocess_revadv(args.data_dir)
-    pass
+
+    # print("Preprocessing DISAPERE")
+    # preprocess_disapere(args.data_dir)
+    # print("Preprocessing AMPERE")
+    # preprocess_ampere(args.data_dir)
+    # print("Preprocessing ReviewAdvisor")
+    # preprocess_revadv(args.data_dir)
+    # print("Downloading ICLR data")
+    # iclr_lib.get_iclr_data(f'{args.data_dir}/raw/iclr/')
+    print("Preprocessing unlabeled ICLR data")
+    prepare_unlabeled_iclr_data(args.data_dir)
 
 
 if __name__ == "__main__":
