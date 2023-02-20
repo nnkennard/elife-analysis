@@ -1,7 +1,6 @@
 config_name: A2
 task: epi
 model_name: bert-base-uncased
-cv: true
 train:
    - disapere
    - ampere

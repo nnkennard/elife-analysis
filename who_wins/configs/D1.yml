@@ -1,12 +1,10 @@
 config_name: D1
 task: asp
 model_name: bert-base-uncased
-cv: true
 train:
    - disapere
 dev:
    - disapere
 test:
    - disapere
-predict:
-   - iclr
+predict: []

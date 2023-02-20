@@ -6,9 +6,18 @@ import torch
 import transformers
 
 from torch.optim import AdamW
-from transformers import BertTokenizer
+from transformers import BertTokenizer, RobertaTokenizer
 
 import who_wins_lib
+
+seed = 34
+torch.manual_seed(seed)
+import random
+random.seed(seed)
+torch.cuda.manual_seed(seed)
+torch.cuda.manual_seed_all(seed)
+torch.backends.cudnn.deterministic=True
+
 
 
 parser = argparse.ArgumentParser(
@@ -98,7 +107,10 @@ def main():
     args = parser.parse_args()
 
     config = who_wins_lib.read_config(args.config)
-    tokenizer = BertTokenizer.from_pretrained(config.model_name)
+    if config.model_name == "roberta-base":
+      tokenizer = RobertaTokenizer.from_pretrained(config.model_name)
+    else:
+      tokenizer = BertTokenizer.from_pretrained(config.model_name)
 
     model = who_wins_lib.Classifier(len(config.labels), config.model_name).to(DEVICE)
     model.loss_fn.to(DEVICE)

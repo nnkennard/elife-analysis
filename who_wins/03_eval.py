@@ -8,9 +8,18 @@ import transformers
 
 from contextlib import nullcontext
 from torch.optim import AdamW
-from transformers import BertTokenizer
+from transformers import BertTokenizer, RobertaTokenizer
 
 import who_wins_lib
+
+seed = 34
+torch.manual_seed(seed)
+import random
+random.seed(seed)
+torch.cuda.manual_seed(seed)
+torch.cuda.manual_seed_all(seed)
+torch.backends.cudnn.deterministic=True
+
 
 DEVICE = "cuda"
 
@@ -40,10 +49,15 @@ def argmax(l):
 
 def do_eval(tokenizer, model, config, eval_subset):
     """Evaluate without backpropagating."""
+    if eval_subset == who_wins_lib.DEV:
+      dev_first_split = False
+    else:
+      dev_first_split = None
     data_loader = who_wins_lib.create_data_loader(
         config,
         eval_subset,
         tokenizer,
+        dev_first_split=dev_first_split,
     )
 
     # Get best model
@@ -67,7 +81,10 @@ def main():
     args = parser.parse_args()
 
     config = who_wins_lib.read_config(args.config)
-    tokenizer = BertTokenizer.from_pretrained(config.model_name)
+    if config.model_name == "roberta-base":
+      tokenizer = RobertaTokenizer.from_pretrained(config.model_name)
+    else:
+      tokenizer = BertTokenizer.from_pretrained(config.model_name)
 
     model = who_wins_lib.Classifier(len(config.labels), config.model_name).to(DEVICE)
     model.loss_fn.to(DEVICE)
