@@ -33,7 +33,7 @@ parser.add_argument(
 # Hyperparameters
 DEVICE = "cuda"
 EPOCHS = 10
-PATIENCE = 5
+PATIENCE = 2
 LEARNING_RATE = 2e-5
 
 HistoryItem = collections.namedtuple(
