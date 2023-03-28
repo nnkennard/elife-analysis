@@ -1,0 +1,10 @@
+config_name: B1
+task: epi
+model_name: roberta-base
+train:
+   - disapere
+dev:
+   - disapere
+test:
+   - disapere
+predict: []

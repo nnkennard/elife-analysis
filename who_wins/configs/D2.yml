@@ -1,0 +1,11 @@
+config_name: D2
+task: asp
+model_name: bert-base-uncased
+train:
+   - disapere
+   - revadv
+dev:
+   - disapere
+test:
+   - disapere
+predict: []
