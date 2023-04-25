@@ -29,15 +29,41 @@ In `01_preprocess_data.py`, all datasets are converted to a single format, using
 ```
 data/
   └─── raw/
-  │     └─── <dataset_name>/ # official dataset name from schema.yml
+  │     └─── <dataset_name>/ # official labeled dataset name from schema.yml
   │           └─── # Whatever raw format the dataset is provided in
   └─── labeled/
+  │     └─── <task_name>/ # official task name from schema.yml 
+  │           └─── <subset>/ # train/dev/test
+  │                 │    <dataset_name_1>.jsonl
+  │                 │    <dataset_name_2>.jsonl
+  │                 └─── ...
+  └─── unlabeled/
         └─── <task_name>/ # official task name from schema.yml 
-              └─── <subset>/ # train/dev/test
-                    │    <dataset_name_1>.jsonl
+              └─── predict/
+                    │    <dataset_name_1>.jsonl # official unlabeled dataset name
                     │    <dataset_name_2>.jsonl
                     └─── ...
 ```
+
+Each line in a _labeled_ jsonl file consists of a json-formatted dictionary with the fields `identifier`, `text`, and `label`. An example:
+
+```
+courbet $ head -n5 data/labeled/epi/train/disapere.jsonl
+{"identifier": "disapere|train|B1euHOqi37|0", "text": "The present paper proposes a fast approximation to the softmax computation when the number of classes is very large.", "label": "nep"}
+{"identifier": "disapere|train|B1euHOqi37|1", "text": "This is typically a bottleneck in deep learning architectures.", "label": "nep"}
+{"identifier": "disapere|train|B1euHOqi37|2", "text": "The approximation is a sparse two-layer mixture of experts.", "label": "nep"}
+{"identifier": "disapere|train|B1euHOqi37|3", "text": "The paper lacks rigor and the writing is of low quality, both in its clarity and its grammar.", "label": "epi"}
+{"identifier": "disapere|train|B1euHOqi37|4", "text": "See a list of typos below.", "label": "nep"}
+```
+
+Lines in a _predict_ jsonl file are similar, but with `label` set to `null`:
+```
+courbet $ head -n2 data/unlabeled/epi/predict/iclr.jsonl
+{"identifier": "iclr|predict|--GJkm7nt0___0|0", "text": "A knowledge distillation framework is proposed for efficient object recognition.", "label": null}
+{"identifier": "iclr|predict|--GJkm7nt0___0|1", "text": "In this framework, the teacher network (TN) performs high accuracy prediction while two student networks (SN) mimic the prediction from TN.", "label": null}
+```
+
+Ideally, we wouldn't have multiple copies of the same unlabeled file under different directories for different tasks, but I did not think it was worth the time it would take to refactor it.
 
 ### 5. Training configurations
 Training configurations are set up using yaml.
