@@ -4,9 +4,8 @@
 1. New task -- epi/nep
 2. Task structure listed in `schema.yml`
 3. Standard format of datasets
-5. Training configurations
-6. 
-3. Outputs include model confidences
+4. Training configurations
+5. Outputs include model confidences
 
 ### 1. New task: epi/nep
 This task distinguishes between 'epistemic' sentences (request and evaluative) and 'non-epistemic' sentences (everything else). This allows us to share information between the two types of epistemic classes, and not waste model parameters on distinguishing between things like structure/social/other.
@@ -65,7 +64,28 @@ courbet $ head -n2 data/unlabeled/epi/predict/iclr.jsonl
 
 Ideally, we wouldn't have multiple copies of the same unlabeled file under different directories for different tasks, but I did not think it was worth the time it would take to refactor it.
 
-### 5. Training configurations
+### 4. Training configurations
 Training configurations are set up using yaml.
 To train a new model, first set up a config. This allows you to swap in different models, and different combinations of datasets for train, dev and test (e.g. train on ICLR test on eLife, train on both test on eLife, etc)
 
+[Example](https://github.com/nnkennard/elife-analysis/blob/main/who_wins/configs/C2.yml)
+
+### 5. Output includes model confidences
+Model output for all the datasets listed under `dev` or `test` in the config take the form of csv files in the `results/` directory. These include the predicted label, as well as the probabilities of all the different labels (the predicted label is just the one with the highest probability)
+
+```
+identifier,label,true_label,epi,nep
+disapere|dev|SJgMKr5h3X|7,0,0,0.9999125003814697,8.749817061470821e-05
+disapere|dev|SJgMKr5h3X|8,0,0,0.9989770650863647,0.001022971817292273
+disapere|dev|SJgMKr5h3X|9,0,0,0.99992835521698,7.167855801526457e-05
+disapere|dev|SJgMKr5h3X|10,0,0,0.999904990196228,9.505140042165294e-05
+```
+
+This information can be used, for example, to only apply apsect or polarity labels to sentences that are 'epistemic' with a probability higher than some threshold.
+
+## Training new models
+
+1. Create a config file in the `configs/` directory. Make sure that the name field of the config matches the filename.
+2. Ensure that the required datasets have been downloaded in `00_prep_data.sh` (if necessary) and preprocessed using `01_preprocess_data.py`.
+3. `python 02_train.py -c <config_name>`
+4. `python 03_eval.py -c <config_name> -e <subset_to_evaluate on>` 
