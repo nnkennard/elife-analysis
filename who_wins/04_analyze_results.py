@@ -4,6 +4,8 @@ import csv
 
 import who_wins_lib
 
+from sklearn.metrics import accuracy_score, precision_recall_fscore_support
+
 parser = argparse.ArgumentParser(description="Analyze Who Wins results")
 parser.add_argument(
     "-c",
@@ -24,74 +26,24 @@ parser.add_argument(
     help="confidence threshold for filtering",
 )
 
-Results = collections.namedtuple("Results", "tp tn fp fn".split())
+Result = collections.namedtuple("Result", "precision recall fscore support".split())
 
-
-def calculate_metrics(predictions, true_labels, label_names):
-    if len(label_names) == 2:
-        return metrics(categorize_binary_labels(predictions, true_labels))
+def modify_with_confidence(probabilities, positive_class, confidence_threshold):
+  labels = []
+  for p_array in probabilities:
+    #print("!!", p_array[positive_class])
+    if max(p_array) == p_array[positive_class]:
+      print("!!", p_array[positive_class])
+    if p_array[positive_class] > confidence_threshold and max(p_array) == p_array[positive_class]:
+      labels.append(1)
     else:
-        results = {}
-        for label_i, label_name in enumerate(label_names):
-            binary_predictions = [pred == label_i for pred in predictions]
-            binary_labels = [t == label_i for t in true_labels]
-            results.update(
-                metrics(
-                    categorize_binary_labels(binary_labels, binary_predictions),
-                    label_name,
-                )
-            )
+      labels.append(0)
+  return labels
 
-        f1s = [v for k, v in results.items() if 'f1' in k]
-        assert len(f1s) == len(label_names)
-        results["macro_f1"] = sum(f1s)/len(f1s)
-        return results
-
-
-def categorize_binary_labels(predictions, true_labels):
-    tp = 0
-    tn = 0
-    fp = 0
-    fn = 0
-
-    for prediction, true_label in zip(predictions, true_labels):
-        if true_label:
-            if prediction:
-                tp += 1
-            else:
-                fn += 1
-        else:
-            if prediction:
-                fp += 1
-            else:
-                tn += 1
-
-    return Results(tp=tp, tn=tn, fp=fp, fn=fn)
-
-
-def metrics(results, name="bin"):
-    total = sum(results)
-    if results.tp or results.fp:
-        precision = results.tp / (results.tp + results.fp)
-    else:
-        precision = 0.0
-    if results.tp or results.fn:
-        recall = results.tp / (results.tp + results.fn)
-    else:
-        recall = 0.0
-
-    if precision or recall:
-        f1 = 2 * precision * recall / (precision + recall)
-    else:
-        f1 = 0.0
-
-    return {
-        f"accuracy_{name}": (results.tp + results.tn) / total,
-        f"precision_{name}": precision,
-        f"recall_{name}": recall,
-        f"f1_{name}": f1,
-    }
-
+def modify_to_binary(labels, positive_class):
+  return [
+    int(label == positive_class)  for label in labels
+  ]
 
 def main():
     args = parser.parse_args()
@@ -101,14 +53,50 @@ def main():
         with open(f"results/{config.config_name}_dev.csv", "r") as f:
             reader = csv.DictReader(f)
             label_names = reader.fieldnames[3:]
-            predictions = []
-            true_labels = []
-            for row in reader:
-                predictions.append(int(row["label"]))
-                true_labels.append(int(row["true_label"]))
-        results = calculate_metrics(predictions, true_labels, label_names)
-        for k, v in results.items():
-            print(k, v)
+            rows = [r for r in reader]
+
+            predictions = [int(row['label']) for row in rows]
+            true_labels = [int(row['true_label']) for row in rows]
+            probabilities = [[float(row[name]) for name in label_names] for row in rows]
+            #true_class_probs = [
+            #  row[label_names[int(row['true_label'])]] for row in rows
+            #]
+            #top_class_probs = [
+            #  row[label_names[int(row['label'])]] for row in rows
+            #]
+
+    print(collections.Counter(predictions))
+    print(collections.Counter(true_labels))
+
+
+    #predictions = predictions[:10]
+    #true_labels = true_labels[:10]
+    #probabilities = probabilities[:10]
+
+
+
+    for label_i, label in enumerate(label_names):
+      new_labels = modify_to_binary(true_labels, label_i)
+      for confidence_x100 in range(0, 1000, 100):
+        confidence = confidence_x100 / 1000
+        print(label, confidence)
+        new_predictions = modify_with_confidence(probabilities, label_i, confidence)
+        print(new_labels)
+        print(new_predictions)
+        metrics = precision_recall_fscore_support(true_labels, predictions)
+        print(metrics[1][label_i])
+        #print(len(metrics), len(metrics[0]))
+        #print(metrics)
+        print()
+      print()
+
+
+    #for k, v in results.items():
+    #  for kk, vv in v.items():
+    #    print(k, kk, vv)
+    #  print()
+
+
 
 
 if __name__ == "__main__":
