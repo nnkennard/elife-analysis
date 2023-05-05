@@ -6,12 +6,134 @@ from interval import Interval
 import json
 import os
 import stanza
-
+import pandas as pd
+from tqdm import tqdm
+# from google.cloud import bigquery
 import iclr_lib
 
 parser = argparse.ArgumentParser(description="")
 parser.add_argument("-d", "--data_dir", default="", type=str, help="")
 
+
+SENTENCIZE_PIPELINE = stanza.Pipeline("en", processors="tokenize")
+TOLERANCE = 7
+Sentence = collections.namedtuple("Sentence", "interval text")
+
+
+def tokenize(text):
+    doc = SENTENCIZE_PIPELINE(text)
+    sentences = []
+    for sentence in doc.sentences:
+        start = sentence.to_dict()[0]["start_char"]
+        end = sentence.to_dict()[-1]["end_char"]
+        sentences.append(Sentence(Interval(start, end), sentence.text))
+    return sentences
+
+# ==== eLife
+# map old elife hand labels 
+# onto new eLife labels
+elife_pol_map = {"0": "non", "POS": "pos", "NEG": "neg"}
+elife_asp_map = {
+    '0': 'non', 
+    'SND': 'snd', 
+    'ORG': 'org', 
+    'MOT': 'mot', 
+    'SUB': 'sbs', 
+    'MNG': 'mng', 
+    'CLR': 'clr', 
+    'REP': 'rep', 
+    'other_ms': 'non',
+    'other_0': 'non', 
+    'other_manuscript': 'non'
+}
+
+def get_elife_labels(row):
+    """
+    Takes a row from the labeled elife csv
+    returns a dict in a standardize format
+    """
+    labels = {
+        "pol": elife_pol_map[row['pol']],
+        "asp": elife_asp_map[row['asp']],
+        "epi": ("epi" if row['act'] in ['REQ', 'EVL'] else "nep")
+    }
+    return labels
+
+
+def preprocess_elife(data_dir):
+    """
+    Takes a csv of labeled elife reviews; 
+    Writes a json file formatted, 
+    1 line = 1 sentence with hand labels + meta data
+    """
+    print("Preprocessing labeled eLife data.")
+    # read in csv of labels
+    elife_csv = glob.glob(data_dir+"raw/eLife/elife*csv")[0]
+    elife_df = pd.read_csv(elife_csv)
+    
+    # split labels into tasks dfs
+    DevTest = elife_df.sample(frac=0.2, random_state=72)
+    train_df = elife_df.drop(DevTest.index)
+    dev_df = DevTest.sample(frac=.5, random_state=72)
+    test_df = DevTest.drop(dev_df.index)
+    dfs_dct = {"train": train_df, "dev": dev_df, "test": test_df}
+    
+    # output rows as json lines
+    lines = collections.defaultdict(list)
+    for task in "train dev test".split():
+        for _, row in dfs_dct[task].iterrows():
+            for feature, label in get_elife_labels(row).items():
+                lines[feature].append(
+                {
+                    "identifier": f"elife|{task}|{row['review_id']}", 
+                    "text": f"{row['text']}", 
+                    "label": label
+                })
+        for feature, examples in lines.items(): 
+            output_dir = f"{data_dir}/labeled/{feature}/{task}/"
+            os.makedirs(output_dir, exist_ok=True)
+            with open(f"{output_dir}/elife.jsonl", "w") as f:
+                f.write("\n".join(json.dumps(e) for e in examples))            
+    
+    
+def get_unlabeled_elife_data(data_dir):
+    """
+    Summons all reviews from bigquery; 
+    Formats them by tokenizing them and appending meta data
+    as a formatted dict, then
+    Writes a giant json, 1 line = 1 review sentence to be predicted
+    """
+    print("Downloading unlabeled eLife data.")
+    
+    # GLOBALS
+    BQ_CLIENT = bigquery.Client()
+    QRY = """
+    SELECT Reviewer_ID, review_id, Major_comments,
+    FROM `gse-nero-dmcfarla-mimir`.eLife.eLife_Reviews_IDRating
+    """
+    
+    # GET Data
+    reviews_df = (BQ_CLIENT.query(QRY).result().to_dataframe()) 
+    reviews_df = reviews_df.dropna()
+    
+    # Write to json
+    print("Processing unlabeled eLife data.")
+    lines = []
+    for _, row in tqdm(reviews_df.iterrows()):
+        sentences = tokenize(row['Major_comments'])
+        for i, sentence in enumerate(sentences):
+            line = {
+                "identifier": f"elife|predict|{row['review_id']}|{i}" , 
+                "text": f"{sentence.text}", 
+                "label": None
+            }
+            lines.append(line)
+    for feature in "pol asp epi".split():
+        output_dir = f"{data_dir}/unlabeled/{feature}/predict"
+        os.makedirs(output_dir, exist_ok=True)
+        with open(f"{output_dir}/elife.jsonl", "w") as f:
+            f.write("\n".join(json.dumps(line) for line in lines))
+                    
 
 # ==== DISAPERE
 
@@ -42,7 +164,7 @@ def get_disapere_labels(sent):
 
 
 def preprocess_disapere(data_dir):
-
+    print("Preprocessing labeled DISAPERE data.")
     for subset in "train dev test".split():
         lines = collections.defaultdict(list)
         for filename in glob.glob(f"{data_dir}/raw/disapere/{subset}/*.json"):
@@ -79,10 +201,11 @@ ampere_epi_map = {
 
 
 def preprocess_ampere(data_dir):
-
+    print("Preprocessing labeled AMPERE data.")
     examples = []
 
     for filename in glob.glob(f"{data_dir}/raw/ampere/*.txt"):
+        print(filename)
         review_id = filename.split("/")[-1].rsplit(".", 1)[0].split("_")[0]
         with open(filename, "r") as f:
             sentence_dicts = []
@@ -101,9 +224,6 @@ def preprocess_ampere(data_dir):
 
 # ==== ReviewAdvisor
 
-SENTENCIZE_PIPELINE = stanza.Pipeline("en", processors="tokenize")
-TOLERANCE = 7
-
 revadv_label_map = {
     "positive": "pos",
     "negative": "neg",
@@ -115,19 +235,6 @@ revadv_label_map = {
     "soundness": "snd",
     "substance": "sbs",
 }
-
-Sentence = collections.namedtuple("Sentence", "interval text")
-
-
-def tokenize(text):
-    doc = SENTENCIZE_PIPELINE(text)
-    sentences = []
-    for sentence in doc.sentences:
-        start = sentence.to_dict()[0]["start_char"]
-        end = sentence.to_dict()[-1]["end_char"]
-        sentences.append(Sentence(Interval(start, end), sentence.text))
-    return sentences
-
 
 def label_sentences(sentences, label_obj):
     labels = [list() for _ in range(len(sentences))]
@@ -149,7 +256,7 @@ def label_sentences(sentences, label_obj):
 
 
 def preprocess_revadv(data_dir):
-
+    print("Preprocessing labeled ReviewAdvisor data.")
     with gzip.open(f"{data_dir}/raw/revadv/review_with_aspect.jsonl.gz", "r") as f:
         lines = collections.defaultdict(list)
         for line in f:
@@ -183,6 +290,7 @@ def preprocess_revadv(data_dir):
 
 
 def prepare_unlabeled_iclr_data(data_dir):
+    print("Preprocessing unlabeled ICLR data.")
     lines = collections.defaultdict(list)
     for filename in glob.glob(f"{data_dir}/raw/iclr/*.json"):
         with open(filename, "r") as f:
@@ -208,16 +316,13 @@ def prepare_unlabeled_iclr_data(data_dir):
 def main():
 
     args = parser.parse_args()
-
-    # print("Preprocessing DISAPERE")
+    # preprocess_elife(args.data_dir)
+    # get_unlabeled_elife_data(args.data_dir)
     # preprocess_disapere(args.data_dir)
-    # print("Preprocessing AMPERE")
     # preprocess_ampere(args.data_dir)
-    # print("Preprocessing ReviewAdvisor")
     # preprocess_revadv(args.data_dir)
-    # print("Downloading ICLR data")
+    print("Downloading ICLR data")
     # iclr_lib.get_iclr_data(f'{args.data_dir}/raw/iclr/')
-    print("Preprocessing unlabeled ICLR data")
     prepare_unlabeled_iclr_data(args.data_dir)
 
 
