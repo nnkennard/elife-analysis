@@ -64,16 +64,31 @@ def get_review_data(discussion_notes, metadata):
     return review_data
 
 
+# def get_decision(discussion_notes):
+#     for note in discussion_notes:
+#         maybe_decision = note.content.get(
+#             "decision", note.content.get("recommendation", None)
+#         )
+#         if maybe_decision is not None:
+#             return maybe_decision
+#     assert False
 def get_decision(discussion_notes):
     for note in discussion_notes:
         maybe_decision = note.content.get(
-            "decision", note.content.get("recommendation", None)
+            "decision", note.content.get(
+                "recommendation", note.content.get(
+                    "withdrawal", None
+                )
+            )
         )
         if maybe_decision is not None:
+            if "withdrawal" in note.content:
+                assert maybe_decision == "Confirmed"
+                return "Withdrawn"
             return maybe_decision
     assert False
 
-
+    
 def get_iclr_data(output_dir):
     for conference, invitation in INVITATION_MAP.items():
         os.makedirs(output_dir, exist_ok=True)
@@ -101,3 +116,5 @@ def get_iclr_data(output_dir):
             for review in get_review_data(discussion_notes, metadata):
                 with open(f'{output_dir}/{review["identifier"]}.json', "w") as f:
                     json.dump(review, f)
+
+                    
