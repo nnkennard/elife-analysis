@@ -48,6 +48,8 @@ def read_config(config_name, schema_path="schema.yml"):
         config = yaml.safe_load(io.StringIO(f.read()))
         assert config["config_name"] == config_name
         assert config["task"] in schema["tasks"]
+        for dataset in config['train']:
+            assert config['task'] in schema['datasets']['labeled'][dataset]
         return Config(labels=schema["labels"][config["task"]], **config)
 
 
