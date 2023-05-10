@@ -27,6 +27,12 @@ parser.add_argument(
     type=float,
     help="confidence threshold for filtering",
 )
+parser.add_argument(
+    "-ec",
+    "--epi_config",
+    type=str,
+    help="config name of final epi predictions",
+)
 
 Config = collections.namedtuple(
     "Config", "config_name task model_name train dev test predict labels".split()
@@ -57,8 +63,8 @@ def modify_with_confidence(probabilities, positive_class, confidence_threshold):
         else:
             labels.append(0)
     return labels
-
-
+    
+    
 def modify_to_binary(labels, positive_class):
     return [int(label == positive_class) for label in labels]
 
@@ -68,26 +74,39 @@ ResultFile = collections.namedtuple(
 )
 
 
-# def read_result_file(filename):
+# def read_result_file(filename, source):
 #     with open(filename, "r") as f:
 #         reader = csv.DictReader(f)
 #         label_names = reader.fieldnames[3:]
 #         rows = [r for r in reader]
-#     predictions = [int(row["label"]) for row in rows]
-#     true_labels = [int(row["true_label"]) for row in rows]
-#     probabilities = [[float(row[name]) for name in label_names] for row in rows]
+#     predictions = [int(row["label"]) for row in rows if source in row['identifier']]
+#     true_labels = [int(row["true_label"]) for row in rows if source in row['identifier']]
+#     probabilities = [[float(row[name]) for name in label_names] for row in rows if source in row['identifier']]
 
 #     return ResultFile(predictions, true_labels, probabilities, label_names)
 
-def read_result_file(filename, source):
-    with open(filename, "r") as f:
+
+def read_result_file(filename, source, epi_config, confidence_threshold):
+    # when not analyzing epi labels
+    # get review ids where we are confident sent is epi
+    if epi_config: 
+        with open(f"results/{epi_config}_dev.csv") as f:
+            reader = csv.DictReader(f)
+            ids = [r['identifier'] for r in reader if float(r['epi'])>=confidence_threshold]
+            print(f"Subsetting to {len(ids)} labels that have confidence of {confidence_threshold}.")
+        with open(filename, "r") as f:
+            reader = csv.DictReader(f)
+            label_names = reader.fieldnames[3:]
+            # subset to confidently epi ids
+            rows = [r for r in reader if r['identifier'] in ids]
+    else:
         reader = csv.DictReader(f)
         label_names = reader.fieldnames[3:]
-        rows = [r for r in reader]
+        rows = [r for r in reader]        
     predictions = [int(row["label"]) for row in rows if source in row['identifier']]
     true_labels = [int(row["true_label"]) for row in rows if source in row['identifier']]
     probabilities = [[float(row[name]) for name in label_names] for row in rows if source in row['identifier']]
-
+        
     return ResultFile(predictions, true_labels, probabilities, label_names)
 
 def main():
@@ -96,7 +115,10 @@ def main():
 
     for source in config.dev:
         # You can also do this on train if you have run eval with the train set
-        result_file = read_result_file(f"results/{config.config_name}_dev.csv", source)
+        result_file = read_result_file(f"results/{config.config_name}_dev.csv", 
+                                       source,
+                                       args.epi_config, 
+                                       float(args.threshold))
         unused_confidence_stuff = """
         for confidence_x100 in range(0, 1000, 100):
             confidence = confidence_x100 / 1000
