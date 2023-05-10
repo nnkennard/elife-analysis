@@ -100,9 +100,10 @@ def read_result_file(filename, source, epi_config, confidence_threshold):
             # subset to confidently epi ids
             rows = [r for r in reader if r['identifier'] in ids]
     else:
-        reader = csv.DictReader(f)
-        label_names = reader.fieldnames[3:]
-        rows = [r for r in reader]        
+        with open(filename, "r") as f:
+            reader = csv.DictReader(f)
+            label_names = reader.fieldnames[3:]
+            rows = [r for r in reader]        
     predictions = [int(row["label"]) for row in rows if source in row['identifier']]
     true_labels = [int(row["true_label"]) for row in rows if source in row['identifier']]
     probabilities = [[float(row[name]) for name in label_names] for row in rows if source in row['identifier']]
@@ -111,6 +112,8 @@ def read_result_file(filename, source, epi_config, confidence_threshold):
 
 def main():
     args = parser.parse_args()
+    if args.threshold: 
+        args.threshold = float(args.threshold)
     config = who_wins_lib.read_config(args.config)
 
     for source in config.dev:
@@ -118,7 +121,7 @@ def main():
         result_file = read_result_file(f"results/{config.config_name}_dev.csv", 
                                        source,
                                        args.epi_config, 
-                                       float(args.threshold))
+                                       args.threshold)
         unused_confidence_stuff = """
         for confidence_x100 in range(0, 1000, 100):
             confidence = confidence_x100 / 1000
