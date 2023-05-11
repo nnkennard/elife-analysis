@@ -1,11 +1,16 @@
-config_name: A2
+config_name: A4
 task: epi
 model_name: roberta-base
 train:
+   - disapere
    - elife
+   - ampere
 dev:
+   - disapere
    - elife
 test:
+   - disapere
    - elife
 predict:
+   - disapere
    - elife

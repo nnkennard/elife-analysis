@@ -37,7 +37,7 @@ labels:
   - mot
   - mng
   - rep
-  - non
+  # - non
 names:
   epi: Epistemic
   nep: Non-epistemic

@@ -2,7 +2,7 @@ import argparse
 import collections
 import glob
 import gzip
-from interval import Interval
+# from interval import Interval
 import json
 import os
 import stanza
@@ -52,6 +52,7 @@ def get_elife_labels(row):
     Takes a row from the labeled elife csv
     returns a dict in a standardize format
     """
+    
     labels = {
         "pol": elife_pol_map[row['pol']],
         "asp": elife_asp_map[row['asp']],
@@ -70,17 +71,35 @@ def preprocess_elife(data_dir):
     # read in csv of labels
     elife_csv = glob.glob(data_dir+"raw/eLife/elife*csv")[0]
     elife_df = pd.read_csv(elife_csv)
+    tr_dfs = []
+    de_dfs = []
+    te_dfs = []
     
-    # split labels into tasks dfs
-    DevTest = elife_df.sample(frac=0.2, random_state=72)
-    train_df = elife_df.drop(DevTest.index)
-    dev_df = DevTest.sample(frac=.5, random_state=72)
-    test_df = DevTest.drop(dev_df.index)
+    # stratified sampling by class of asp:
+    for asp in elife_df['asp'].unique(): 
+        df = elife_df[elife_df['asp']==asp]
+        DevTest = df.sample(frac=0.2, random_state=72)
+        train_df = df.drop(DevTest.index)
+        tr_dfs.append(train_df)
+        dev_df = DevTest.sample(frac=.5, random_state=72)
+        de_dfs.append(dev_df)
+        test_df = DevTest.drop(dev_df.index) 
+        te_dfs.append(test_df)
+    
+    dev_df = pd.concat(de_dfs)
+    train_df = pd.concat(tr_dfs)
+    test_df = pd.concat(te_dfs)
+    
+    # # split labels into tasks dfs
+    # DevTest = elife_df.sample(frac=0.2, random_state=72)
+    # train_df = elife_df.drop(DevTest.index)
+    # dev_df = DevTest.sample(frac=.5, random_state=72)
+    # test_df = DevTest.drop(dev_df.index)
     dfs_dct = {"train": train_df, "dev": dev_df, "test": test_df}
-    
+
     # output rows as json lines
-    lines = collections.defaultdict(list)
     for task in "train dev test".split():
+        lines = collections.defaultdict(list)
         for _, row in dfs_dct[task].iterrows():
             for feature, label in get_elife_labels(row).items():
                 lines[feature].append(
@@ -316,14 +335,14 @@ def prepare_unlabeled_iclr_data(data_dir):
 def main():
 
     args = parser.parse_args()
-    # preprocess_elife(args.data_dir)
+    preprocess_elife(args.data_dir)
     # get_unlabeled_elife_data(args.data_dir)
     # preprocess_disapere(args.data_dir)
     # preprocess_ampere(args.data_dir)
     # preprocess_revadv(args.data_dir)
-    print("Downloading ICLR data")
+    # print("Downloading ICLR data")
     # iclr_lib.get_iclr_data(f'{args.data_dir}/raw/iclr/')
-    prepare_unlabeled_iclr_data(args.data_dir)
+    # prepare_unlabeled_iclr_data(args.data_dir)
 
 
 if __name__ == "__main__":

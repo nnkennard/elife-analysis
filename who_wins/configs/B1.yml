@@ -1,5 +1,5 @@
 config_name: B1
-task: epi
+task: pol
 model_name: roberta-base
 train:
    - disapere
@@ -7,4 +7,5 @@ dev:
    - disapere
 test:
    - disapere
-predict: []
+predict:
+   - disapere

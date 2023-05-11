@@ -48,6 +48,8 @@ def read_config(config_name, schema_path="schema.yml"):
         config = yaml.safe_load(io.StringIO(f.read()))
         assert config["config_name"] == config_name
         assert config["task"] in schema["tasks"]
+        for dataset in config['train']:
+            assert config['task'] in schema['datasets']['labeled'][dataset]
         return Config(labels=schema["labels"][config["task"]], **config)
 
 
@@ -58,19 +60,22 @@ def get_text_and_labels(config, subset):
     target_indices = []
 
     labeled_unlabeled = "unlabeled" if subset == "predict" else "labeled"
+    
     for source in config._asdict()[subset]:
         with open(
             f"data/{labeled_unlabeled}/{config.task}/{subset}/{source}.jsonl", "r"
         ) as f:
             for line in f:
                 example = json.loads(line)
-                texts.append(example["text"])
-                identifiers.append(example["identifier"])
-                if subset == 'predict':
-                  target_indices.append(-1)
+                if example["label"] != "non":
+                    texts.append(example["text"])
+                    identifiers.append(example["identifier"])
+                    if subset == 'predict':
+                      target_indices.append(-1)
+                    else:
+                      target_indices.append(config.labels.index(example["label"]))
                 else:
                   target_indices.append(config.labels.index(example["label"]))
-
     return identifiers, texts, target_indices
 
 
