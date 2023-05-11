@@ -1,10 +1,11 @@
 config_name: C1
-task: pol
-model_name: bert-base-uncased
+task: asp
+model_name: roberta-base
 train:
    - disapere
 dev:
    - disapere
 test:
    - disapere
-predict: []
+predict:
+   - disapere

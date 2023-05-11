@@ -103,7 +103,8 @@ def read_result_file(filename, source, epi_config, confidence_threshold):
         with open(filename, "r") as f:
             reader = csv.DictReader(f)
             label_names = reader.fieldnames[3:]
-            rows = [r for r in reader]        
+            rows = [r for r in reader]
+            print(f"there are {len(rows)} rows in {filename}")
     predictions = [int(row["label"]) for row in rows if source in row['identifier']]
     true_labels = [int(row["true_label"]) for row in rows if source in row['identifier']]
     probabilities = [[float(row[name]) for name in label_names] for row in rows if source in row['identifier']]

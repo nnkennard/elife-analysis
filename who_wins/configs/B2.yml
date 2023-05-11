@@ -1,5 +1,5 @@
-config_name: A2
-task: epi
+config_name: B2
+task: pol
 model_name: roberta-base
 train:
    - elife

@@ -1,11 +1,11 @@
 config_name: C2
-task: pol
-model_name: bert-base-uncased
+task: asp
+model_name: roberta-base
 train:
-   - disapere
-   - revadv
+   - elife
 dev:
-   - disapere
+   - elife
 test:
-   - disapere
-predict: []
+   - elife
+predict:
+   - elife

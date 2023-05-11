@@ -65,27 +65,25 @@ def get_text_and_labels(config, subset, dev_first_split=None):
     target_indices = []
 
     labeled_unlabeled = "unlabeled" if subset == "predict" else "labeled"
+    
     for source in config._asdict()[subset]:
         with open(
             f"data/{labeled_unlabeled}/{config.task}/{subset}/{source}.jsonl", "r"
         ) as f:
             for line in f:
                 example = json.loads(line)
-                texts.append(example["text"])
-                identifiers.append(example["identifier"])
-                if subset == 'predict':
-                  target_indices.append(-1)
+                if example["label"] != "non":
+                    texts.append(example["text"])
+                    identifiers.append(example["identifier"])
+                    if subset == 'predict':
+                      target_indices.append(-1)
+                    else:
+                      target_indices.append(config.labels.index(example["label"]))
                 else:
-                  target_indices.append(config.labels.index(example["label"]))
-
-    if subset == DEV:
-      cutoff = int(len(identifiers) / 2)
-      if dev_first_split:
-        return identifiers[:cutoff], texts[:cutoff], target_indices[:cutoff]
-      else:
-        return identifiers[cutoff:], texts[cutoff:], target_indices[cutoff:]
-    else:
-      return identifiers, texts, target_indices
+                    pass
+    
+    # if subset == DEV:
+    return identifiers, texts, target_indices
 
 
 class ClassificationDataset(Dataset):
