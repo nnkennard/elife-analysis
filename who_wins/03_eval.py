@@ -51,15 +51,10 @@ def argmax(l):
 
 def do_eval(tokenizer, model, config, eval_subset):
     """Evaluate without backpropagating."""
-    if eval_subset == who_wins_lib.DEV:
-      dev_first_split = False
-    else:
-      dev_first_split = None
     data_loader = who_wins_lib.create_data_loader(
         config,
         eval_subset,
         tokenizer,
-        dev_first_split=dev_first_split,
     )
 
     # Get best model

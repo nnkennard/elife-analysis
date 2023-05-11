@@ -51,12 +51,7 @@ def read_config(config_name, schema_path="schema.yml"):
         return Config(labels=schema["labels"][config["task"]], **config)
 
 
-def get_text_and_labels(config, subset, dev_first_split=None):
-
-    if subset == DEV:
-      assert dev_first_split is not None
-    else:
-      assert dev_first_split is None
+def get_text_and_labels(config, subset):
 
     texts = []
     identifiers = []
@@ -76,25 +71,18 @@ def get_text_and_labels(config, subset, dev_first_split=None):
                 else:
                   target_indices.append(config.labels.index(example["label"]))
 
-    if subset == DEV:
-      cutoff = int(len(identifiers) / 2)
-      if dev_first_split:
-        return identifiers[:cutoff], texts[:cutoff], target_indices[:cutoff]
-      else:
-        return identifiers[cutoff:], texts[cutoff:], target_indices[cutoff:]
-    else:
-      return identifiers, texts, target_indices
+    return identifiers, texts, target_indices
 
 
 class ClassificationDataset(Dataset):
     """A torch.utils.data.Dataset for classification."""
 
-    def __init__(self, config, subset, tokenizer, dev_first_split, max_len=512):
+    def __init__(self, config, subset, tokenizer, max_len=512):
         (
             self.identifiers,
             self.texts,
             self.target_indices,
-        ) = get_text_and_labels(config, subset, dev_first_split)
+        ) = get_text_and_labels(config, subset)
         target_set = set(self.target_indices)
         assert target_set.issubset(range(len(config.labels))) or target_set == set([-1])
         eye = np.eye(
@@ -123,7 +111,7 @@ class ClassificationDataset(Dataset):
         }
 
 
-def create_data_loader(config, subset, tokenizer, dev_first_split=None):
+def create_data_loader(config, subset, tokenizer):
     """Wrap a DataLoader around a PolarityDetectionDataset.
 
     While the dataset manages the content of the data, the data loader is more
@@ -134,7 +122,6 @@ def create_data_loader(config, subset, tokenizer, dev_first_split=None):
         config,
         subset,
         tokenizer=tokenizer,
-        dev_first_split=dev_first_split,
     )
     return DataLoader(ds, batch_size=BATCH_SIZES[subset], num_workers=4)
 
@@ -151,7 +138,6 @@ def build_data_loaders(config, tokenizer):
             config,
             DEV,
             tokenizer,
-            dev_first_split=True,
         ),
     )
 
