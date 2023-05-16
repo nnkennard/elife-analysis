@@ -7,16 +7,19 @@ import transformers
 
 from torch.optim import AdamW
 from transformers import BertTokenizer, RobertaTokenizer
+from transformers import AutoTokenizer
 
 import who_wins_lib
 
 seed = 34
 torch.manual_seed(seed)
 import random
+
 random.seed(seed)
 torch.cuda.manual_seed_all(seed)
-os.environ['PYTHONHASHSEED'] = str(seed)
+os.environ["PYTHONHASHSEED"] = str(seed)
 import numpy as np
+
 np.random.seed(seed)
 
 
@@ -107,10 +110,16 @@ def main():
     args = parser.parse_args()
 
     config = who_wins_lib.read_config(args.config)
-    if config.model_name == "roberta-base":
-      tokenizer = RobertaTokenizer.from_pretrained(config.model_name)
-    else:
-      tokenizer = BertTokenizer.from_pretrained(config.model_name)
+    # if config.model_name == "roberta-base":
+    #   tokenizer = RobertaTokenizer.from_pretrained(config.model_name)
+    # else:
+    # tokenizer = BertTokenizer.from_pretrained(config.model_name)
+    tokenizer = AutoTokenizer.from_pretrained(config.model_name)
+
+    # ------------
+    if config.model_name == "gpt2":
+        tokenizer.pad_token = tokenizer.eos_token
+    # ------------
 
     model = who_wins_lib.Classifier(len(config.labels), config.model_name).to(DEVICE)
     model.loss_fn.to(DEVICE)

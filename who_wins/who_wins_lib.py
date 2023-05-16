@@ -8,7 +8,9 @@ import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 import tqdm
 import yaml
-from transformers import BertModel
+
+# from transformers import BertModel
+from transformers import BertModel, AutoModel
 
 CONFIG_PATH = "configs/"
 
@@ -40,6 +42,7 @@ Config = collections.namedtuple(
 )
 
 
+
 def read_config(config_name, schema_path="schema.yml"):
     with open(schema_path, "r") as f:
         schema = yaml.safe_load(io.StringIO(f.read()))
@@ -48,8 +51,8 @@ def read_config(config_name, schema_path="schema.yml"):
         config = yaml.safe_load(io.StringIO(f.read()))
         assert config["config_name"] == config_name
         assert config["task"] in schema["tasks"]
-        for dataset in config['train']:
-            assert config['task'] in schema['datasets']['labeled'][dataset]
+        for dataset in config["train"]:
+            assert config["task"] in schema["datasets"]["labeled"][dataset]
         return Config(labels=schema["labels"][config["task"]], **config)
 
 
@@ -60,7 +63,7 @@ def get_text_and_labels(config, subset):
     target_indices = []
 
     labeled_unlabeled = "unlabeled" if subset == "predict" else "labeled"
-    
+
     for source in config._asdict()[subset]:
         with open(
             f"data/{labeled_unlabeled}/{config.task}/{subset}/{source}.jsonl", "r"
@@ -70,12 +73,12 @@ def get_text_and_labels(config, subset):
                 if example["label"] != "non":
                     texts.append(example["text"])
                     identifiers.append(example["identifier"])
-                    if subset == 'predict':
-                      target_indices.append(-1)
+                    if subset == "predict":
+                        target_indices.append(-1)
                     else:
-                      target_indices.append(config.labels.index(example["label"]))
+                        target_indices.append(config.labels.index(example["label"]))
                 else:
-                  target_indices.append(config.labels.index(example["label"]))
+                    pass
     return identifiers, texts, target_indices
 
 
@@ -150,7 +153,8 @@ def build_data_loaders(config, tokenizer):
 class Classifier(nn.Module):
     def __init__(self, num_classes, model_name):
         super(Classifier, self).__init__()
-        self.bert = BertModel.from_pretrained(model_name)
+        # self.bert = BertModel.from_pretrained(model_name)
+        self.bert = AutoModel.from_pretrained(model_name)
         self.drop = nn.Dropout(p=0.3)
         self.out = nn.Linear(self.bert.config.hidden_size, num_classes)
         if num_classes == 2:
@@ -160,7 +164,16 @@ class Classifier(nn.Module):
 
     def forward(self, input_ids, attention_mask):  # This function is required
         bert_output = self.bert(input_ids=input_ids, attention_mask=attention_mask)
-        output = self.drop(bert_output["pooler_output"])
+
+        # ----------
+        # print(bert_output.keys())
+        if "last_hidden_state" in bert_output: # gpt2, electra
+            output = self.drop(bert_output["last_hidden_state"])
+        else: 
+            output = self.drop(bert_output["pooler_output"])
+        # print(output.shape)
+        # ----------
+
         return self.out(output)
 
 
@@ -216,14 +229,33 @@ def train_or_eval(
                     )
                 )
 
-
             # Counting correct predictions in order to calculate accuracy later
+
+            # ----------
+            # print(preds.shape)
+            # print(target_indices.shape)
+            if len(preds.shape) != len(target_indices):
+                target_indices = target_indices.unsqueeze(1)
+            # print(target_indices.shape)
+            # ----------
+
             correct_predictions += torch.sum(preds == target_indices)
 
             if is_train:
                 # We need loss for both train and eval, but restricting to
                 # train in order to make our lives easier for predict mode
+                
+                # ----------
+                # print(outputs.shape)
+                # print(targets.shape)                
+                if len(outputs.shape) == 3: 
+                    targets = targets.unsqueeze(1)  # Add a dimension to match the input shape
+                    targets = targets.repeat(1, outputs.shape[1], 1)  # Repeat along the sequence length dimension
+                # ----------
+
                 loss = model.loss_fn(outputs, targets)
+
+
                 losses.append(loss.item())
                 # Backpropagation steps
                 loss.backward()

@@ -2,12 +2,14 @@ import argparse
 import collections
 import glob
 import gzip
+
 # from interval import Interval
 import json
 import os
 import stanza
 import pandas as pd
 from tqdm import tqdm
+
 # from google.cloud import bigquery
 import iclr_lib
 
@@ -29,67 +31,70 @@ def tokenize(text):
         sentences.append(Sentence(Interval(start, end), sentence.text))
     return sentences
 
+
 # ==== eLife
-# map old elife hand labels 
+# map old elife hand labels
 # onto new eLife labels
 elife_pol_map = {"0": "non", "POS": "pos", "NEG": "neg"}
 elife_asp_map = {
-    '0': 'non', 
-    'SND': 'snd', 
-    'ORG': 'org', 
-    'MOT': 'mot', 
-    'SUB': 'sbs', 
-    'MNG': 'mng', 
-    'CLR': 'clr', 
-    'REP': 'rep', 
-    'other_ms': 'non',
-    'other_0': 'non', 
-    'other_manuscript': 'non'
+    "0": "non",
+    "SND": "snd",
+    "ORG": "org",
+    "MOT": "mot",
+    "SUB": "sbs",
+    "MNG": "mng",
+    "CLR": "clr",
+    "REP": "rep",
+    "other_ms": "non",
+    "other_0": "non",
+    "other_manuscript": "non",
 }
+
 
 def get_elife_labels(row):
     """
     Takes a row from the labeled elife csv
     returns a dict in a standardize format
     """
-    
+
     labels = {
-        "pol": elife_pol_map[row['pol']],
-        "asp": elife_asp_map[row['asp']],
-        "epi": ("epi" if row['act'] in ['REQ', 'EVL'] else "nep")
+        "pol": elife_pol_map[row["pol"]],
+        "asp": elife_asp_map[row["asp"]],
+        "epi": ("epi" if row["act"] in ["REQ", "EVL", "HYP"] else "nep"),
     }
     return labels
 
 
 def preprocess_elife(data_dir):
     """
-    Takes a csv of labeled elife reviews; 
-    Writes a json file formatted, 
+    Takes a csv of labeled elife reviews;
+    Writes a json file formatted,
     1 line = 1 sentence with hand labels + meta data
     """
     print("Preprocessing labeled eLife data.")
     # read in csv of labels
-    elife_csv = glob.glob(data_dir+"raw/eLife/elife*csv")[0]
+    elife_csv = glob.glob(data_dir + "raw/eLife/*relabeled*.csv")[0]
+    print(elife_csv)
     elife_df = pd.read_csv(elife_csv)
     tr_dfs = []
     de_dfs = []
     te_dfs = []
-    
+
     # stratified sampling by class of asp:
-    for asp in elife_df['asp'].unique(): 
-        df = elife_df[elife_df['asp']==asp]
+    for asp in elife_df["asp"].unique():
+        df = elife_df[elife_df["asp"] == asp]
         DevTest = df.sample(frac=0.2, random_state=72)
         train_df = df.drop(DevTest.index)
         tr_dfs.append(train_df)
-        dev_df = DevTest.sample(frac=.5, random_state=72)
+        dev_df = DevTest.sample(frac=0.5, random_state=72)
         de_dfs.append(dev_df)
-        test_df = DevTest.drop(dev_df.index) 
+        test_df = DevTest.drop(dev_df.index)
         te_dfs.append(test_df)
-    
+
     dev_df = pd.concat(de_dfs)
     train_df = pd.concat(tr_dfs)
     test_df = pd.concat(te_dfs)
-    
+
     # # split labels into tasks dfs
     # DevTest = elife_df.sample(frac=0.2, random_state=72)
     # train_df = elife_df.drop(DevTest.index)
@@ -103,48 +108,49 @@ def preprocess_elife(data_dir):
         for _, row in dfs_dct[task].iterrows():
             for feature, label in get_elife_labels(row).items():
                 lines[feature].append(
-                {
-                    "identifier": f"elife|{task}|{row['review_id']}", 
-                    "text": f"{row['text']}", 
-                    "label": label
-                })
-        for feature, examples in lines.items(): 
+                    {
+                        "identifier": f"elife|{task}|{row['review_id']}",
+                        "text": f"{row['text']}",
+                        "label": label,
+                    }
+                )
+        for feature, examples in lines.items():
             output_dir = f"{data_dir}/labeled/{feature}/{task}/"
             os.makedirs(output_dir, exist_ok=True)
             with open(f"{output_dir}/elife.jsonl", "w") as f:
-                f.write("\n".join(json.dumps(e) for e in examples))            
-    
-    
+                f.write("\n".join(json.dumps(e) for e in examples))
+
+
 def get_unlabeled_elife_data(data_dir):
     """
-    Summons all reviews from bigquery; 
+    Summons all reviews from bigquery;
     Formats them by tokenizing them and appending meta data
     as a formatted dict, then
     Writes a giant json, 1 line = 1 review sentence to be predicted
     """
     print("Downloading unlabeled eLife data.")
-    
+
     # GLOBALS
     BQ_CLIENT = bigquery.Client()
     QRY = """
     SELECT Reviewer_ID, review_id, Major_comments,
     FROM `gse-nero-dmcfarla-mimir`.eLife.eLife_Reviews_IDRating
     """
-    
+
     # GET Data
-    reviews_df = (BQ_CLIENT.query(QRY).result().to_dataframe()) 
+    reviews_df = BQ_CLIENT.query(QRY).result().to_dataframe()
     reviews_df = reviews_df.dropna()
-    
+
     # Write to json
     print("Processing unlabeled eLife data.")
     lines = []
     for _, row in tqdm(reviews_df.iterrows()):
-        sentences = tokenize(row['Major_comments'])
+        sentences = tokenize(row["Major_comments"])
         for i, sentence in enumerate(sentences):
             line = {
-                "identifier": f"elife|predict|{row['review_id']}|{i}" , 
-                "text": f"{sentence.text}", 
-                "label": None
+                "identifier": f"elife|predict|{row['review_id']}|{i}",
+                "text": f"{sentence.text}",
+                "label": None,
             }
             lines.append(line)
     for feature in "pol asp epi".split():
@@ -152,7 +158,7 @@ def get_unlabeled_elife_data(data_dir):
         os.makedirs(output_dir, exist_ok=True)
         with open(f"{output_dir}/elife.jsonl", "w") as f:
             f.write("\n".join(json.dumps(line) for line in lines))
-                    
+
 
 # ==== DISAPERE
 
@@ -254,6 +260,7 @@ revadv_label_map = {
     "soundness": "snd",
     "substance": "sbs",
 }
+
 
 def label_sentences(sentences, label_obj):
     labels = [list() for _ in range(len(sentences))]
