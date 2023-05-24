@@ -18,6 +18,12 @@ datasets:
     revadv:
     - asp
     - pol
+    gpt-iclr:
+    - pol
+    - asp
+    gpt-elife: 
+    - pol
+    - asp
   unlabeled:
   - iclr
   - elifeall
@@ -28,30 +34,38 @@ labels:
   pol:
   - pos
   - neg
-  - non
-  asp:
-  - sbs
-  - clr
-  - snd
-  - org
-  - mot
-  - mng
-  - rep
   # - non
+  asp:
+  # - sbs
+  # - clr
+  # - snd
+  # - org
+  # - mot
+  # - mng
+  # - rep
+  # - non
+  - acc
+  - nvl
+  - cst
+  - clr
 names:
-  epi: Epistemic
-  nep: Non-epistemic
-  pol: Polarity
-  pos: Positive
-  neg: Negative
-  neu: Neutral
-  asp: Aspect
-  sbs: Substantiality
+  # epi: Epistemic
+  # nep: Non-epistemic
+  # pol: Polarity
+  # pos: Positive
+  # neg: Negative
+  # neu: Neutral
+  # asp: Aspect
+  # sbs: Substantiality
+  # clr: Clarity
+  # snd: Soundness
+  # org: Originality
+  # mot: Motiviation/Impact
+  # mng: MeaningfulComparison
+  # rep: Replicability
+  # non: None
+  acc: Accuracy 
+  nvl: Novelty
+  cst: Consistency
   clr: Clarity
-  snd: Soundness
-  org: Originality
-  mot: Motiviation/Impact
-  mng: MeaningfulComparison
-  rep: Replicability
-  non: None
 

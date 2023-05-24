@@ -3,7 +3,7 @@ import collections
 import glob
 import gzip
 
-# from interval import Interval
+from interval import Interval
 import json
 import os
 import stanza
@@ -36,20 +36,36 @@ def tokenize(text):
 # map old elife hand labels
 # onto new eLife labels
 elife_pol_map = {"0": "non", "POS": "pos", "NEG": "neg"}
+# elife_asp_map = {
+#     "0": "non",
+#     "SND": "snd",
+#     "ORG": "org",
+#     "MOT": "mot",
+#     "SUB": "sbs",
+#     "MNG": "mng",
+#     "CLR": "clr",
+#     "REP": "rep",
+#     "other_ms": "non",
+#     "other_0": "non",
+#     "other_": "non",
+#     "other_n": "non",
+#     "other_manuscript": "non",
+# }
 elife_asp_map = {
     "0": "non",
-    "SND": "snd",
-    "ORG": "org",
-    "MOT": "mot",
-    "SUB": "sbs",
-    "MNG": "mng",
+    "SND": "acc",
+    "ORG": "nvl",
+    "MOT": "nvl",
+    "SUB": "acc",
+    "MNG": "cst",
     "CLR": "clr",
-    "REP": "rep",
+    "REP": "cst",
     "other_ms": "non",
     "other_0": "non",
+    "other_": "non",
+    "other_n": "non",
     "other_manuscript": "non",
 }
-
 
 def get_elife_labels(row):
     """
@@ -72,9 +88,9 @@ def preprocess_elife(data_dir):
     1 line = 1 sentence with hand labels + meta data
     """
     print("Preprocessing labeled eLife data.")
+    
     # read in csv of labels
-    elife_csv = glob.glob(data_dir + "raw/eLife/*relabeled*.csv")[0]
-    print(elife_csv)
+    elife_csv = glob.glob(data_dir + "raw/eLife/*relabeled.csv")[0]
     elife_df = pd.read_csv(elife_csv)
     tr_dfs = []
     de_dfs = []
@@ -94,12 +110,6 @@ def preprocess_elife(data_dir):
     dev_df = pd.concat(de_dfs)
     train_df = pd.concat(tr_dfs)
     test_df = pd.concat(te_dfs)
-
-    # # split labels into tasks dfs
-    # DevTest = elife_df.sample(frac=0.2, random_state=72)
-    # train_df = elife_df.drop(DevTest.index)
-    # dev_df = DevTest.sample(frac=.5, random_state=72)
-    # test_df = DevTest.drop(dev_df.index)
     dfs_dct = {"train": train_df, "dev": dev_df, "test": test_df}
 
     # output rows as json lines
@@ -160,22 +170,57 @@ def get_unlabeled_elife_data(data_dir):
             f.write("\n".join(json.dumps(line) for line in lines))
 
 
+            
+# ==== GPT
+    
+def preprocess_gpt(data_dir):
+    
+    gpt_dct = {
+        "iclr": {
+            "train": train_iclr,
+            "dev": dev_iclr, 
+            "test": test_iclr
+        },
+        "elife": {
+            "train": train_elife,
+            "dev": dev_elife, 
+            "test": test_elife
+        },
+    }
+    
+    
+    for task in "train dev test".split():
+        for feature in "pol asp".split():
+            output_dir = f"{data_dir}/labeled/{feature}/{task}/"
+            with open(f"{output_dir}/{}.jsonl", "w") as f:
+                f.write("\n".join(json.dumps(example) for example in examples))
+
 # ==== DISAPERE
 
 disapere_pol_map = {"none": "non", "pol_negative": "neg", "pol_positive": "pos"}
 
+# disapere_asp_map = {
+#     "arg_other": "non",
+#     "asp_clarity": "clr",
+#     "asp_meaningful-comparison": "mng",
+#     "asp_motivation-impact": "mot",
+#     "asp_originality": "org",
+#     "asp_replicability": "rep",
+#     "asp_soundness-correctness": "snd",
+#     "asp_substance": "sbs",
+#     "none": "non",
+# }
 disapere_asp_map = {
     "arg_other": "non",
     "asp_clarity": "clr",
-    "asp_meaningful-comparison": "mng",
-    "asp_motivation-impact": "mot",
-    "asp_originality": "org",
-    "asp_replicability": "rep",
-    "asp_soundness-correctness": "snd",
-    "asp_substance": "sbs",
+    "asp_meaningful-comparison": "cst",
+    "asp_motivation-impact": "nvl",
+    "asp_originality": "nvl",
+    "asp_replicability": "cst",
+    "asp_soundness-correctness": "acc",
+    "asp_substance": "acc",
     "none": "non",
 }
-
 
 def get_disapere_labels(sent):
     labels = {
@@ -249,16 +294,27 @@ def preprocess_ampere(data_dir):
 
 # ==== ReviewAdvisor
 
+# revadv_label_map = {
+#     "positive": "pos",
+#     "negative": "neg",
+#     "clarity": "clr",
+#     "meaningful_comparison": "mng",
+#     "motivation": "mot",
+#     "originality": "org",
+#     "replicability": "rep",
+#     "soundness": "snd",
+#     "substance": "sbs",
+# }
 revadv_label_map = {
     "positive": "pos",
     "negative": "neg",
     "clarity": "clr",
-    "meaningful_comparison": "mng",
-    "motivation": "mot",
-    "originality": "org",
-    "replicability": "rep",
-    "soundness": "snd",
-    "substance": "sbs",
+    "meaningful_comparison": "cst",
+    "motivation": "nvl",
+    "originality": "nvl",
+    "replicability": "cst",
+    "soundness": "acc",
+    "substance": "acc",
 }
 
 
@@ -342,11 +398,12 @@ def prepare_unlabeled_iclr_data(data_dir):
 def main():
 
     args = parser.parse_args()
-    preprocess_elife(args.data_dir)
+    print(args.data_dir)
+    # preprocess_elife(args.data_dir)
     # get_unlabeled_elife_data(args.data_dir)
-    # preprocess_disapere(args.data_dir)
+    preprocess_disapere(args.data_dir)
     # preprocess_ampere(args.data_dir)
-    # preprocess_revadv(args.data_dir)
+    preprocess_revadv(args.data_dir)
     # print("Downloading ICLR data")
     # iclr_lib.get_iclr_data(f'{args.data_dir}/raw/iclr/')
     # prepare_unlabeled_iclr_data(args.data_dir)

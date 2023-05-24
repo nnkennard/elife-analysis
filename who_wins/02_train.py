@@ -110,18 +110,28 @@ def main():
     args = parser.parse_args()
 
     config = who_wins_lib.read_config(args.config)
-    # if config.model_name == "roberta-base":
-    #   tokenizer = RobertaTokenizer.from_pretrained(config.model_name)
-    # else:
-    # tokenizer = BertTokenizer.from_pretrained(config.model_name)
-    tokenizer = AutoTokenizer.from_pretrained(config.model_name)
+    
+    
+    # ------------
+    if config.model_name == "roberta-base":
+        tokenizer = RobertaTokenizer.from_pretrained(config.model_name)
+    else:
+        tokenizer = BertTokenizer.from_pretrained(config.model_name)
+    # tokenizer = AutoTokenizer.from_pretrained(config.model_name)
+    # ------------
+
 
     # ------------
     if config.model_name == "gpt2":
         tokenizer.pad_token = tokenizer.eos_token
     # ------------
-
+    
+    
+    # ------------
     model = who_wins_lib.Classifier(len(config.labels), config.model_name).to(DEVICE)
+    # model = AutoModelForSequenceClassification(config.model_name, len(config.labels)).to(DEVICE)
+    # ------------
+    
     model.loss_fn.to(DEVICE)
 
     do_train(tokenizer, model, config)

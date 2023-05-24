@@ -9,7 +9,8 @@ import transformers
 import tqdm
 #from contextlib import nullcontext
 #from torch.optim import AdamW
-from transformers import BertTokenizer, RobertaTokenizer
+# from transformers import BertTokenizer, RobertaTokenizer
+from transformers import BertTokenizer, RobertaTokenizer, AutoTokenizer
 
 import who_wins_lib
 
@@ -51,7 +52,8 @@ parser.add_argument(
     help="preprocessed eLife file",
 )
 
-BATCH_SIZE = 128
+# BATCH_SIZE = 128
+BATCH_SIZE = 64
 
 predict_tokenizer_fn = lambda tok, texts: tok.batch_encode_plus(
     texts,
@@ -79,7 +81,7 @@ def do_predict(tokenizer, model, input_file, config):
             encoded_review = predict_tokenizer_fn(tokenizer, batch)
             input_ids = encoded_review["input_ids"].to(DEVICE)
             attention_mask = encoded_review["attention_mask"].to(DEVICE)
-            output = model(input_ids, attention_mask)
+            output = model(input_ids, attention_mask).logits
             _, batch_predictions = torch.max(output, dim=1)
             predictions += batch_predictions
     for example, prediction in zip(examples, predictions):
@@ -94,10 +96,16 @@ def main():
     args = parser.parse_args()
 
     config = who_wins_lib.read_config(args.config)
-    if config.model_name == "roberta-base":
-      tokenizer = RobertaTokenizer.from_pretrained(config.model_name)
-    else:
-      tokenizer = BertTokenizer.from_pretrained(config.model_name)
+    
+    
+    # -----------------
+    tokenizer = AutoTokenizer.from_pretrained(config.model_name)
+    # if config.model_name == "roberta-base":
+    #   tokenizer = RobertaTokenizer.from_pretrained(config.model_name)
+    # else:
+    #   tokenizer = BertTokenizer.from_pretrained(config.model_name)
+    # -----------------
+
 
     model = who_wins_lib.Classifier(len(config.labels), config.model_name).to(DEVICE)
     model.loss_fn.to(DEVICE)
