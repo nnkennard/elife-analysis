@@ -302,6 +302,7 @@ def goodbye():
     print("END INTERACTIVE SESSION!")
     print("+" * 33)
     print("\n" * 3)
+    return None
 
 
 def get_file_path(args):
@@ -347,24 +348,26 @@ def main():
 
             # open existing rated reviews file
             rater_df = pd.read_csv(file_path)
+            print(f"{rater_df.shape[0]} sentences already labeled!")
             already_reviewed = list(rater_df["identifier"])
             truncated_sentences_df = sentences_df[
                 ~sentences_df["identifier"].isin(already_reviewed)
             ]
             print(f"{truncated_sentences_df.shape[0]} sentences left to label.")
-            if not truncated_sentences_df.iloc[0]["identifier"].endswith("|||0"):
-                print_whole_review(
-                    truncated_sentences_df.iloc[0]["review_id"],
-                    sentences_df,
+            if truncated_sentences_df.shape[0] != 0:
+                if not truncated_sentences_df.iloc[0]["identifier"].endswith("|||0"):
+                    print_whole_review(
+                        truncated_sentences_df.iloc[0]["review_id"],
+                        sentences_df,
+                        args.width,
+                    )
+                label_sentences(
+                    truncated_sentences_df,
+                    args.n_sents,
+                    args.first_time,
+                    file_path,
                     args.width,
                 )
-            label_sentences(
-                truncated_sentences_df,
-                args.n_sents,
-                args.first_time,
-                file_path,
-                args.width,
-            )
 
     # End
     goodbye()

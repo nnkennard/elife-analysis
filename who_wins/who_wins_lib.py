@@ -8,10 +8,8 @@ import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 import tqdm
 import yaml
-
-# from transformers import BertModel
-from transformers import BertModel, AutoModel
-
+from transformers import BertModel, AutoModelForSequenceClassification
+torch.cuda.empty_cache()
 CONFIG_PATH = "configs/"
 
 TRAIN, DEV, TEST, PREDICT, EVAL = "train dev test predict eval".split()
@@ -40,7 +38,6 @@ tokenizer_fn = lambda tok, text: tok.encode_plus(
 Config = collections.namedtuple(
     "Config", "config_name task model_name train dev test predict labels".split()
 )
-
 
 
 def read_config(config_name, schema_path="schema.yml"):
@@ -153,29 +150,15 @@ def build_data_loaders(config, tokenizer):
 class Classifier(nn.Module):
     def __init__(self, num_classes, model_name):
         super(Classifier, self).__init__()
-        # self.bert = BertModel.from_pretrained(model_name)
-        self.bert = AutoModel.from_pretrained(model_name)
-        self.drop = nn.Dropout(p=0.3)
-        self.out = nn.Linear(self.bert.config.hidden_size, num_classes)
+        self.bert_like = AutoModelForSequenceClassification.from_pretrained(model_name, num_labels=num_classes)
         if num_classes == 2:
             self.loss_fn = nn.BCEWithLogitsLoss()  # Not sure if this is reasonable
         else:
             self.loss_fn = nn.CrossEntropyLoss()
 
     def forward(self, input_ids, attention_mask):  # This function is required
-        bert_output = self.bert(input_ids=input_ids, attention_mask=attention_mask)
-
-        # ----------
-        # print(bert_output.keys())
-        if "last_hidden_state" in bert_output: # gpt2, electra
-            output = self.drop(bert_output["last_hidden_state"])
-        else: 
-            output = self.drop(bert_output["pooler_output"])
-        # print(output.shape)
-        # ----------
-
-        return self.out(output)
-
+        return self.bert_like(input_ids=input_ids, attention_mask=attention_mask)
+    
 
 def train_or_eval(
     mode,
@@ -212,7 +195,8 @@ def train_or_eval(
                 for k in "input_ids attention_mask targets target_indices".split()
             ]
 
-            outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+            outputs = model(input_ids=input_ids, attention_mask=attention_mask).logits
+            # print(outputs)
             # ^ this gives logits
             _, preds = torch.max(outputs, dim=1)
             # TODO(nnk): make this argmax!
@@ -234,8 +218,8 @@ def train_or_eval(
             # ----------
             # print(preds.shape)
             # print(target_indices.shape)
-            if len(preds.shape) != len(target_indices):
-                target_indices = target_indices.unsqueeze(1)
+            # if len(preds.shape) != len(target_indices):
+            #     target_indices = target_indices.unsqueeze(1)
             # print(target_indices.shape)
             # ----------
 
@@ -248,9 +232,9 @@ def train_or_eval(
                 # ----------
                 # print(outputs.shape)
                 # print(targets.shape)                
-                if len(outputs.shape) == 3: 
-                    targets = targets.unsqueeze(1)  # Add a dimension to match the input shape
-                    targets = targets.repeat(1, outputs.shape[1], 1)  # Repeat along the sequence length dimension
+                # if len(outputs.shape) == 3: 
+                #     targets = targets.unsqueeze(1)  # Add a dimension to match the input shape
+                #     targets = targets.repeat(1, outputs.shape[1], 1)  # Repeat along the sequence length dimension
                 # ----------
 
                 loss = model.loss_fn(outputs, targets)
